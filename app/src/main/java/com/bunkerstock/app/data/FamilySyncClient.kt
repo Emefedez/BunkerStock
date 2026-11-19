@@ -6,8 +6,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLDecoder
@@ -15,13 +16,15 @@ import java.net.URLEncoder
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
 import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 object FamilySyncClient {
 
-    const val DEFAULT_SERVER = "https://api.restful-api.dev/objects"
+    const val DEFAULT_SERVER = "https://textdb.dev/api/data"
     private const val GCM_IV_BYTES = 12
     private const val GCM_TAG_BITS = 128
 
@@ -31,32 +34,50 @@ object FamilySyncClient {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
     }
 
+    fun generateRoomId(): String {
+        val bytes = ByteArray(12)
+        SecureRandom().nextBytes(bytes)
+        return "bs_" + bytes.joinToString("") { "%02x".format(it) }
+    }
+
     private fun deriveAesKey(secretKey: String): SecretKeySpec {
         val digest = MessageDigest.getInstance("SHA-256").digest(secretKey.toByteArray(Charsets.UTF_8))
         return SecretKeySpec(digest, "AES")
     }
 
+    private fun gzip(bytes: ByteArray): ByteArray {
+        val out = ByteArrayOutputStream()
+        GZIPOutputStream(out).use { it.write(bytes) }
+        return out.toByteArray()
+    }
+
+    private fun gunzip(bytes: ByteArray): ByteArray =
+        GZIPInputStream(ByteArrayInputStream(bytes)).use { it.readBytes() }
+
     fun encryptSnapshot(snapshot: FamilySyncSnapshot, secretKey: String): String {
-        val plain = InventoryLogic.json.encodeToString(snapshot).toByteArray(Charsets.UTF_8)
+        val compressed = gzip(InventoryLogic.json.encodeToString(snapshot).toByteArray(Charsets.UTF_8))
         val iv = ByteArray(GCM_IV_BYTES).also { SecureRandom().nextBytes(it) }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, deriveAesKey(secretKey), GCMParameterSpec(GCM_TAG_BITS, iv))
-        val encrypted = cipher.doFinal(plain)
+        val encrypted = cipher.doFinal(compressed)
         val combined = ByteArray(iv.size + encrypted.size)
         System.arraycopy(iv, 0, combined, 0, iv.size)
         System.arraycopy(encrypted, 0, combined, iv.size, encrypted.size)
-        return Base64.getEncoder().encodeToString(combined)
+        return "v2:" + Base64.getEncoder().encodeToString(combined)
     }
 
-    fun decryptSnapshot(cipherBase64: String, secretKey: String): FamilySyncSnapshot? = runCatching {
-        val combined = Base64.getDecoder().decode(cipherBase64)
+    fun decryptSnapshot(rawPayload: String, secretKey: String): FamilySyncSnapshot? = runCatching {
+        val isGzipped = rawPayload.startsWith("v2:")
+        val b64 = if (isGzipped) rawPayload.removePrefix("v2:") else rawPayload
+        val combined = Base64.getDecoder().decode(b64)
         if (combined.size <= GCM_IV_BYTES) return null
         val iv = combined.copyOfRange(0, GCM_IV_BYTES)
         val encrypted = combined.copyOfRange(GCM_IV_BYTES, combined.size)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, deriveAesKey(secretKey), GCMParameterSpec(GCM_TAG_BITS, iv))
-        val plain = cipher.doFinal(encrypted).toString(Charsets.UTF_8)
-        InventoryLogic.json.decodeFromString<FamilySyncSnapshot>(plain)
+        val plainBytes = cipher.doFinal(encrypted)
+        val jsonBytes = if (isGzipped) gunzip(plainBytes) else plainBytes
+        InventoryLogic.json.decodeFromString<FamilySyncSnapshot>(jsonBytes.toString(Charsets.UTF_8))
     }.getOrNull()
 
     fun buildInviteLink(config: FamilyGroupConfig): String {
@@ -94,19 +115,12 @@ object FamilySyncClient {
         )
     }
 
-    /**
-     * Strips device-local filesystem photo paths so sync stays tiny & private.
-     * Remote devices resolve product photos automatically via Open Food Facts / web lookup.
-     */
     private fun sanitizeForUpload(items: List<InventoryItem>): List<InventoryItem> =
         items.map { item ->
             val remoteImg = item.imageUri?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
             item.copy(imageUri = remoteImg)
         }
 
-    /**
-     * Conflict-free per-item Last-Write-Wins merge preserving local custom photos.
-     */
     fun mergeSnapshots(
         localItems: List<InventoryItem>,
         localDeleted: Map<String, Long>,
@@ -131,7 +145,6 @@ object FamilySyncClient {
             val winner = when {
                 l != null && r != null -> {
                     val chosen = if (r.updatedAt > l.updatedAt) r else l
-                    // Preserve local custom replaced image on this device
                     val localCustomImg = l.imageUri?.takeIf { !it.startsWith("http://") && !it.startsWith("https://") }
                     if (localCustomImg != null) chosen.copy(imageUri = localCustomImg) else chosen
                 }
@@ -140,13 +153,58 @@ object FamilySyncClient {
                 else -> continue
             }
 
-            if (delTs > winner.updatedAt) {
-                continue
-            }
+            if (delTs > winner.updatedAt) continue
             result.add(winner)
         }
 
         return result.sortedByDescending { it.updatedAt } to mergedDeleted
+    }
+
+    private fun writeCipherToEndpoint(endpoint: String, cipherText: String) {
+        val conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 10000
+            readTimeout = 10000
+            doOutput = true
+            setRequestProperty("Content-Type", "text/plain; charset=utf-8")
+            setRequestProperty("User-Agent", "BunkerStock-Android/3.1")
+        }
+        try {
+            conn.outputStream.use { it.write(cipherText.toByteArray(Charsets.UTF_8)) }
+            if (conn.responseCode !in 200..299) {
+                error("HTTP ${conn.responseCode}")
+            }
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    private fun readCipherFromEndpoint(endpoint: String): String? {
+        val conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 10000
+            readTimeout = 10000
+            setRequestProperty("User-Agent", "BunkerStock-Android/3.1")
+        }
+        return try {
+            if (conn.responseCode !in 200..299) return null
+            val raw = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }.trim()
+            if (raw.isBlank() || raw == "null") return null
+            // textdb.dev returns a JSON-quoted string; custom workers may return JSON {"data":{"cipher":"..."}}
+            when {
+                raw.startsWith("\"") && raw.endsWith("\"") ->
+                    runCatching { InventoryLogic.json.decodeFromString<String>(raw) }.getOrDefault(raw.trim('"'))
+                raw.startsWith("{") -> {
+                    val obj = runCatching { InventoryLogic.json.parseToJsonElement(raw) as? JsonObject }.getOrNull()
+                    val data = obj?.get("data") as? JsonObject
+                    data?.get("cipher")?.jsonPrimitive?.contentOrNull
+                        ?: obj?.get("cipher")?.jsonPrimitive?.contentOrNull
+                }
+                else -> raw
+            }
+        } finally {
+            conn.disconnect()
+        }
     }
 
     suspend fun createGroup(
@@ -158,6 +216,7 @@ object FamilySyncClient {
     ): Result<FamilyGroupConfig> = withContext(Dispatchers.IO) {
         runCatching {
             val now = System.currentTimeMillis()
+            val roomId = generateRoomId()
             val secret = generateSecretKey()
             val stamped = sanitizeForUpload(localItems).map {
                 if (it.updatedAt == 0L) it.copy(updatedAt = now, updatedBy = memberName) else it
@@ -169,37 +228,17 @@ object FamilySyncClient {
                 updatedAt = now
             )
             val cipher = encryptSnapshot(snapshot, secret)
-            val bodyJson = """{"name":"bs-e2e","data":{"v":1,"cipher":"$cipher"}}"""
+            val endpoint = "${serverBaseUrl.trimEnd('/')}/$roomId"
+            writeCipherToEndpoint(endpoint, cipher)
 
-            val conn = (URL(serverBaseUrl).openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                connectTimeout = 8000
-                readTimeout = 8000
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json")
-                setRequestProperty("Accept", "application/json")
-                setRequestProperty("User-Agent", "BunkerStock-Android/3.0")
-            }
-            try {
-                conn.outputStream.use { it.write(bodyJson.toByteArray(Charsets.UTF_8)) }
-                if (conn.responseCode !in 200..299) {
-                    error("HTTP ${conn.responseCode}")
-                }
-                val resp = conn.inputStream.bufferedReader().use { it.readText() }
-                val root = InventoryLogic.json.parseToJsonElement(resp).jsonObject
-                val roomId = root["id"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
-                    ?: error("Missing room id")
-                FamilyGroupConfig(
-                    roomId = roomId,
-                    secretKey = secret,
-                    groupName = snapshot.groupName,
-                    memberName = memberName.trim(),
-                    serverBaseUrl = serverBaseUrl,
-                    lastSyncedAt = now
-                )
-            } finally {
-                conn.disconnect()
-            }
+            FamilyGroupConfig(
+                roomId = roomId,
+                secretKey = secret,
+                groupName = snapshot.groupName,
+                memberName = memberName.trim(),
+                serverBaseUrl = serverBaseUrl,
+                lastSyncedAt = now
+            )
         }
     }
 
@@ -210,36 +249,12 @@ object FamilySyncClient {
         isInitialJoin: Boolean = false
     ): Result<Triple<List<InventoryItem>, Map<String, Long>, FamilyGroupConfig>> = withContext(Dispatchers.IO) {
         runCatching {
-            val baseUrl = config.serverBaseUrl.trimEnd('/')
-            val endpoint = "$baseUrl/${config.roomId}"
+            val endpoint = "${config.serverBaseUrl.trimEnd('/')}/${config.roomId}"
+            val cipherIn = readCipherFromEndpoint(endpoint)
+                ?: error("Grupo no encontrado en el servidor")
+            val remoteSnapshot = decryptSnapshot(cipherIn, config.secretKey)
+                ?: error("No se pudo descifrar el grupo (clave incorrecta)")
 
-            // 1. GET encrypted remote snapshot
-            val getConn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = 8000
-                readTimeout = 8000
-                setRequestProperty("Accept", "application/json")
-                setRequestProperty("User-Agent", "BunkerStock-Android/3.0")
-            }
-            val remoteSnapshot: FamilySyncSnapshot? = try {
-                if (getConn.responseCode in 200..299) {
-                    val resp = getConn.inputStream.bufferedReader().use { it.readText() }
-                    val root = InventoryLogic.json.parseToJsonElement(resp) as? JsonObject
-                    val data = root?.get("data") as? JsonObject
-                    val cipher = data?.get("cipher")?.jsonPrimitive?.contentOrNull
-                    cipher?.let { decryptSnapshot(it, config.secretKey) }
-                } else {
-                    null
-                }
-            } finally {
-                getConn.disconnect()
-            }
-
-            if (remoteSnapshot == null) {
-                error("Could not decrypt or reach family group")
-            }
-
-            // On initial join, adopt family stock cleanly if local only had default demo items
             val effectiveLocal = if (isInitialJoin && localItems.all { it.id.startsWith("item-") && it.id.length <= 7 }) {
                 emptyList()
             } else {
@@ -255,26 +270,8 @@ object FamilySyncClient {
                 updatedAt = now
             )
 
-            // 2. PUT merged encrypted snapshot back
-            val cipher = encryptSnapshot(updatedSnapshot, config.secretKey)
-            val bodyJson = """{"name":"bs-e2e","data":{"v":1,"cipher":"$cipher"}}"""
-            val putConn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
-                requestMethod = "PUT"
-                connectTimeout = 8000
-                readTimeout = 8000
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json")
-                setRequestProperty("Accept", "application/json")
-                setRequestProperty("User-Agent", "BunkerStock-Android/3.0")
-            }
-            try {
-                putConn.outputStream.use { it.write(bodyJson.toByteArray(Charsets.UTF_8)) }
-                if (putConn.responseCode !in 200..299) {
-                    error("Sync upload HTTP ${putConn.responseCode}")
-                }
-            } finally {
-                putConn.disconnect()
-            }
+            val cipherOut = encryptSnapshot(updatedSnapshot, config.secretKey)
+            writeCipherToEndpoint(endpoint, cipherOut)
 
             Triple(
                 mergedItems,

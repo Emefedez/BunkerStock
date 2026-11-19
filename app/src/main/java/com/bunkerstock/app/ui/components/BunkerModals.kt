@@ -70,10 +70,25 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.rememberCoroutineScope
 import android.content.Intent
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.DialogProperties
+import com.bunkerstock.app.R
+import com.bunkerstock.app.data.AppLanguage
 import com.bunkerstock.app.data.FamilyGroupConfig
 import com.bunkerstock.app.data.FamilySyncClient
 import com.bunkerstock.app.data.ProductImageStore
@@ -1113,6 +1128,313 @@ fun FamilyGroupDialog(
                     ) {
                         Text(strings.close)
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BatchQrPdfDialog(
+    items: List<InventoryItem>,
+    isBusy: Boolean,
+    onSavePdf: (Set<String>) -> Unit,
+    onSharePdf: (Set<String>) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val strings = LocalAppStrings.current
+    val colors = LocalBunkerColors.current
+    var selectedIds by remember(items) {
+        mutableStateOf(items.map { it.id }.toSet())
+    }
+    val allSelected = items.isNotEmpty() && selectedIds.size == items.size
+    val pageCount = QrCodeUtils.batchPageCount(selectedIds.size)
+
+    Dialog(onDismissRequest = { if (!isBusy) onDismiss() }) {
+        Surface(
+            shape = RoundedCornerShape(BunkerRadius.Sheet),
+            color = colors.cardSurface,
+            border = BorderStroke(1.dp, colors.borderSubtle),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = colors.amber)
+                    Text(strings.batchQrTitle, style = MaterialTheme.typography.titleLarge)
+                }
+
+                Text(
+                    text = strings.batchQrSubtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.mutedText
+                )
+
+                // Select All toggle + page count pill
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = {
+                            selectedIds = if (allSelected) emptySet() else items.map { it.id }.toSet()
+                        },
+                        enabled = !isBusy && items.isNotEmpty()
+                    ) {
+                        Text(
+                            text = if (allSelected) strings.batchQrDeselectAll else strings.batchQrSelectAll,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(BunkerRadius.Badge),
+                        color = colors.emeraldContainer,
+                        border = BorderStroke(1.dp, colors.emerald.copy(alpha = 0.45f))
+                    ) {
+                        Text(
+                            text = strings.batchQrSummary(selectedIds.size, pageCount),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = colors.emerald,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.7f))
+
+                if (items.isEmpty()) {
+                    Text(
+                        text = strings.emptyTitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.mutedText,
+                        modifier = Modifier.padding(vertical = 18.dp)
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 300.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(items, key = { it.id }) { item ->
+                            val checked = selectedIds.contains(item.id)
+                            val cat = ItemCategory.fromKey(item.category)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(BunkerRadius.Control))
+                                    .background(if (checked) colors.cardElevated else colors.canvas)
+                                    .border(
+                                        1.dp,
+                                        if (checked) colors.emerald.copy(alpha = 0.45f) else colors.borderSubtle.copy(alpha = 0.5f),
+                                        RoundedCornerShape(BunkerRadius.Control)
+                                    )
+                                    .clickable(enabled = !isBusy) {
+                                        selectedIds = if (checked) selectedIds - item.id else selectedIds + item.id
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Checkbox(
+                                    checked = checked,
+                                    onCheckedChange = null,
+                                    colors = CheckboxDefaults.colors(checkedColor = colors.emerald)
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = item.name,
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "${strings.categoryLabel(cat)} · ${item.barcode.ifBlank { "BNK-AUTO" }}",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 10.sp
+                                        ),
+                                        color = colors.mutedText,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.7f))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { onSavePdf(selectedIds) },
+                        enabled = !isBusy && selectedIds.isNotEmpty(),
+                        shape = RoundedCornerShape(BunkerRadius.Control),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        if (isBusy) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(5.dp))
+                            Text(strings.batchQrSavePdf, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    Button(
+                        onClick = { onSharePdf(selectedIds) },
+                        enabled = !isBusy && selectedIds.isNotEmpty(),
+                        shape = RoundedCornerShape(BunkerRadius.Control),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text(strings.batchQrSharePdf, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+
+                TextButton(
+                    onClick = onDismiss,
+                    enabled = !isBusy,
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text(strings.close)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun FirstTimeSetupDialog(
+    selectedLanguage: AppLanguage,
+    onLanguageSelect: (AppLanguage) -> Unit,
+    onComplete: () -> Unit
+) {
+    val strings = LocalAppStrings.current
+    val colors = LocalBunkerColors.current
+
+    Dialog(
+        onDismissRequest = {},
+        properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(BunkerRadius.Sheet),
+            color = colors.cardSurface,
+            border = BorderStroke(1.dp, colors.emerald.copy(alpha = 0.55f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_bunker_shield),
+                    contentDescription = null,
+                    modifier = Modifier.size(56.dp)
+                )
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = strings.brandBunker,
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold)
+                        )
+                        Text(
+                            text = strings.brandStock,
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+                            color = colors.emerald
+                        )
+                    }
+                    Text(
+                        text = "Idioma / Language",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = colors.amber
+                    )
+                    Text(
+                        text = strings.setupWelcomeSubtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.mutedText,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val options = listOf(
+                        Triple(AppLanguage.ES, "Español", "Interfaz completa en español"),
+                        Triple(AppLanguage.EN, "English", "Full interface in English")
+                    )
+                    options.forEach { (lang, title, sub) ->
+                        val active = selectedLanguage == lang
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(BunkerRadius.Control))
+                                .background(if (active) colors.emeraldContainer else colors.canvas)
+                                .border(
+                                    if (active) 1.5.dp else 1.dp,
+                                    if (active) colors.emerald else colors.borderSubtle,
+                                    RoundedCornerShape(BunkerRadius.Control)
+                                )
+                                .clickable(role = Role.RadioButton) { onLanguageSelect(lang) }
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (active) Icons.Default.CheckCircle else Icons.Default.Language,
+                                contentDescription = null,
+                                tint = if (active) colors.emerald else colors.mutedText,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = title,
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = if (active) colors.emerald else MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = sub,
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
+                                    color = colors.mutedText
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Button(
+                    onClick = onComplete,
+                    shape = RoundedCornerShape(BunkerRadius.Control),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(46.dp)
+                ) {
+                    Text(strings.setupContinue, fontWeight = FontWeight.Bold)
                 }
             }
         }

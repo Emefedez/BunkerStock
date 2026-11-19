@@ -7,6 +7,7 @@ import com.bunkerstock.app.data.InventoryItem
 import com.bunkerstock.app.data.ItemCategory
 import com.bunkerstock.app.data.ItemPrefill
 import com.bunkerstock.app.data.ItemUnit
+import com.bunkerstock.app.data.ProductNutrition
 import com.bunkerstock.app.data.SortOption
 import com.bunkerstock.app.data.StatusFilter
 import kotlinx.serialization.encodeToString
@@ -57,7 +58,8 @@ object InventoryLogic {
             noExpiry = false,
             expiryDate = relativeDateString(14, today),
             location = "Estantería 1 - Balda B",
-            notes = "Rotar urgentemente al consumo diario"
+            notes = "Rotar urgentemente al consumo diario",
+            nutrition = ProductNutrition(nutriScoreGrade = "B", novaGroup = 2, healthScore = 76)
         ),
         InventoryItem(
             id = "item-3",
@@ -69,7 +71,8 @@ object InventoryLogic {
             noExpiry = false,
             expiryDate = relativeDateString(-5, today),
             location = "Mochila 72h",
-            notes = "Revisar y reemplazar lote caducado"
+            notes = "Revisar y reemplazar lote caducado",
+            nutrition = ProductNutrition(nutriScoreGrade = "C", novaGroup = 3, healthScore = 54)
         ),
         InventoryItem(
             id = "item-4",
@@ -81,7 +84,8 @@ object InventoryLogic {
             noExpiry = false,
             expiryDate = relativeDateString(320, today),
             location = "Estantería 1 - Balda A",
-            notes = "Bolsas de 1kg selladas"
+            notes = "Bolsas de 1kg selladas",
+            nutrition = ProductNutrition(nutriScoreGrade = "A", novaGroup = 1, healthScore = 90)
         ),
         InventoryItem(
             id = "item-5",
@@ -141,14 +145,18 @@ object InventoryLogic {
             noExpiry = false,
             expiryDate = relativeDateString(72, today),
             location = "Estantería 2 - Balda C",
-            notes = "Listas para consumir sin cocción"
+            notes = "Listas para consumir sin cocción",
+            nutrition = ProductNutrition(nutriScoreGrade = "A", novaGroup = 1, healthScore = 88)
         )
     )
 
     fun getExpiryInfo(
         item: InventoryItem,
         today: LocalDate = LocalDate.now(),
-        notApplicableLabel: String = "No aplica"
+        notApplicableLabel: String = "No aplica",
+        expiredDays: Int = 0,
+        criticalDays: Int = 30,
+        warningDays: Int = 90
     ): ExpiryInfo {
         if (item.noExpiry || item.expiryDate.isBlank()) {
             return ExpiryInfo(
@@ -169,9 +177,9 @@ object InventoryLogic {
         val formatted = expDate.format(displayFormatter)
 
         val status = when {
-            daysLeft < 0L -> ExpiryStatus.EXPIRED
-            daysLeft <= 30L -> ExpiryStatus.CRITICAL
-            daysLeft <= 90L -> ExpiryStatus.WARNING
+            daysLeft < expiredDays.toLong() -> ExpiryStatus.EXPIRED
+            daysLeft <= criticalDays.toLong() -> ExpiryStatus.CRITICAL
+            daysLeft <= warningDays.toLong() -> ExpiryStatus.WARNING
             else -> ExpiryStatus.OPTIMAL
         }
 
@@ -187,7 +195,10 @@ object InventoryLogic {
         items: List<InventoryItem>,
         persons: Int = 2,
         litersPerPersonDay: Int = 3,
-        today: LocalDate = LocalDate.now()
+        today: LocalDate = LocalDate.now(),
+        expiredDays: Int = 0,
+        criticalDays: Int = 30,
+        warningDays: Int = 90
     ): DashboardMetrics {
         val totalRefs = items.size
         var totalUnits = 0.0
@@ -201,7 +212,7 @@ object InventoryLogic {
         for (item in items) {
             val qty = item.qty.coerceAtLeast(0.0)
             totalUnits += qty
-            when (getExpiryInfo(item, today).status) {
+            when (getExpiryInfo(item, today, expiredDays = expiredDays, criticalDays = criticalDays, warningDays = warningDays).status) {
                 ExpiryStatus.EXPIRED -> expiredCount++
                 ExpiryStatus.CRITICAL -> criticalCount++
                 ExpiryStatus.WARNING -> warningCount++
@@ -249,38 +260,68 @@ object InventoryLogic {
         categoryFilter: String?, // null means ALL
         statusFilter: StatusFilter,
         sortOption: SortOption,
-        today: LocalDate = LocalDate.now()
+        today: LocalDate = LocalDate.now(),
+        expiredDays: Int = 0,
+        criticalDays: Int = 30,
+        warningDays: Int = 90
+    ): List<InventoryItem> = filterAndSortMulti(
+        items = items,
+        query = query,
+        categories = categoryFilter?.let { setOf(it) } ?: emptySet(),
+        statuses = if (statusFilter == StatusFilter.ALL) emptySet() else setOf(statusFilter),
+        sortOption = sortOption,
+        today = today,
+        expiredDays = expiredDays,
+        criticalDays = criticalDays,
+        warningDays = warningDays
+    )
+
+    fun filterAndSortMulti(
+        items: List<InventoryItem>,
+        query: String,
+        categories: Set<String>, // empty means ALL
+        statuses: Set<StatusFilter>, // empty means ALL
+        sortOption: SortOption,
+        today: LocalDate = LocalDate.now(),
+        expiredDays: Int = 0,
+        criticalDays: Int = 30,
+        warningDays: Int = 90
     ): List<InventoryItem> {
         val q = query.trim().lowercase()
+        val effectiveStatuses = statuses.filterNot { it == StatusFilter.ALL }.toSet()
         val filtered = items.filter { item ->
-            val info = getExpiryInfo(item, today)
+            val info = getExpiryInfo(item, today, expiredDays = expiredDays, criticalDays = criticalDays, warningDays = warningDays)
             val matchesQuery = q.isEmpty() ||
                 item.name.lowercase().contains(q) ||
                 item.barcode.lowercase().contains(q) ||
                 item.location.lowercase().contains(q) ||
                 item.notes.lowercase().contains(q)
 
-            val matchesCategory = categoryFilter == null ||
-                item.category.equals(categoryFilter, ignoreCase = true)
+            val matchesCategory = categories.isEmpty() ||
+                categories.any { item.category.equals(it, ignoreCase = true) }
 
-            val matchesStatus = when (statusFilter) {
-                StatusFilter.ALL -> true
-                StatusFilter.ALERT_ALL ->
-                    info.status == ExpiryStatus.EXPIRED || info.status == ExpiryStatus.CRITICAL
-                StatusFilter.EXPIRED -> info.status == ExpiryStatus.EXPIRED
-                StatusFilter.CRITICAL -> info.status == ExpiryStatus.CRITICAL
-                StatusFilter.WARNING -> info.status == ExpiryStatus.WARNING
-                StatusFilter.OPTIMAL -> info.status == ExpiryStatus.OPTIMAL
-                StatusFilter.NONE -> info.status == ExpiryStatus.NONE
+            val matchesStatus = effectiveStatuses.isEmpty() || effectiveStatuses.any { st ->
+                when (st) {
+                    StatusFilter.ALL -> true
+                    StatusFilter.ALERT_ALL ->
+                        info.status == ExpiryStatus.EXPIRED || info.status == ExpiryStatus.CRITICAL
+                    StatusFilter.EXPIRED -> info.status == ExpiryStatus.EXPIRED
+                    StatusFilter.CRITICAL -> info.status == ExpiryStatus.CRITICAL
+                    StatusFilter.WARNING -> info.status == ExpiryStatus.WARNING
+                    StatusFilter.OPTIMAL -> info.status == ExpiryStatus.OPTIMAL
+                    StatusFilter.NONE -> info.status == ExpiryStatus.NONE
+                }
             }
 
             matchesQuery && matchesCategory && matchesStatus
         }
 
         return when (sortOption) {
-            SortOption.EXPIRY_ASC -> filtered.sortedBy { getExpiryInfo(it, today).daysLeft }
+            SortOption.EXPIRY_ASC -> filtered.sortedBy {
+                getExpiryInfo(it, today, expiredDays = expiredDays, criticalDays = criticalDays, warningDays = warningDays).daysLeft
+            }
             SortOption.EXPIRY_DESC -> filtered.sortedByDescending {
-                val d = getExpiryInfo(it, today).daysLeft
+                val d = getExpiryInfo(it, today, expiredDays = expiredDays, criticalDays = criticalDays, warningDays = warningDays).daysLeft
                 if (d == Long.MAX_VALUE) Long.MIN_VALUE else d
             }
             SortOption.NAME_ASC -> filtered.sortedBy { it.name.lowercase() }

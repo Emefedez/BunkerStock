@@ -5,9 +5,12 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Warning
 import com.bunkerstock.app.data.FamilyGroupConfig
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -82,9 +85,11 @@ fun SettingsScreen(
     onLanguageChange: (AppLanguage) -> Unit,
     onThemeModeChange: (AppThemeMode) -> Unit,
     onWaterConfigChange: (Int, Int) -> Unit,
+    onExpiryThresholdsChange: (Int, Int, Int) -> Unit,
     onExpiryNotifChange: (Boolean) -> Unit,
     onAutoUpdateChange: (Boolean) -> Unit,
     onCheckUpdatesNow: () -> Unit,
+    onOpenBatchQr: () -> Unit,
     onExportJson: () -> Unit,
     onExportCsv: () -> Unit,
     onImportJson: () -> Unit,
@@ -278,9 +283,73 @@ fun SettingsScreen(
             }
             HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.7f))
 
+            // SECTION 2B: EXPIRY THRESHOLDS (DAYS)
+            SettingsSectionLabel(strings.settingsSectionThresholds)
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                StepperSettingRow(
+                    icon = Icons.Default.Warning,
+                    iconTint = colors.danger,
+                    label = strings.thresholdExpiredDays,
+                    value = settings.expiredThresholdDays,
+                    onDecrement = {
+                        onExpiryThresholdsChange(
+                            (settings.expiredThresholdDays - 1).coerceAtLeast(0),
+                            settings.criticalThresholdDays,
+                            settings.warningThresholdDays
+                        )
+                    },
+                    onIncrement = {
+                        onExpiryThresholdsChange(
+                            (settings.expiredThresholdDays + 1).coerceAtMost(30),
+                            settings.criticalThresholdDays,
+                            settings.warningThresholdDays
+                        )
+                    }
+                )
+                StepperSettingRow(
+                    icon = Icons.Default.HourglassBottom,
+                    iconTint = colors.amber,
+                    label = strings.thresholdCriticalDays,
+                    value = settings.criticalThresholdDays,
+                    onDecrement = {
+                        val next = (settings.criticalThresholdDays - 5).coerceAtLeast(settings.expiredThresholdDays + 1)
+                        onExpiryThresholdsChange(settings.expiredThresholdDays, next, settings.warningThresholdDays)
+                    },
+                    onIncrement = {
+                        val next = (settings.criticalThresholdDays + 5).coerceAtMost(365)
+                        onExpiryThresholdsChange(settings.expiredThresholdDays, next, settings.warningThresholdDays)
+                    }
+                )
+                StepperSettingRow(
+                    icon = Icons.Default.HourglassBottom,
+                    iconTint = colors.warning,
+                    label = strings.thresholdWarningDays,
+                    value = settings.warningThresholdDays,
+                    onDecrement = {
+                        val next = (settings.warningThresholdDays - 10).coerceAtLeast(settings.criticalThresholdDays + 1)
+                        onExpiryThresholdsChange(settings.expiredThresholdDays, settings.criticalThresholdDays, next)
+                    },
+                    onIncrement = {
+                        val next = (settings.warningThresholdDays + 10).coerceAtMost(730)
+                        onExpiryThresholdsChange(settings.expiredThresholdDays, settings.criticalThresholdDays, next)
+                    }
+                )
+            }
+            HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.7f))
+
             // SECTION 3: DATA & BACKUPS
             SettingsSectionLabel(strings.settingsSectionData)
             Column {
+                SettingsActionRow(
+                    icon = Icons.Default.PictureAsPdf,
+                    iconTint = colors.amber,
+                    title = strings.batchQrMenu,
+                    subtitle = strings.batchQrMenuSub,
+                    onClick = onOpenBatchQr
+                )
                 SettingsActionRow(
                     icon = Icons.Default.Download,
                     iconTint = colors.emerald,
@@ -462,7 +531,7 @@ private fun StepperSettingRow(
                 text = value.toString(),
                 style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace),
                 textAlign = TextAlign.Center,
-                modifier = Modifier.width(34.dp)
+                modifier = Modifier.width(42.dp)
             )
             IconButton(onClick = onIncrement, modifier = Modifier.size(44.dp)) {
                 Icon(Icons.Default.Add, contentDescription = strings.addOne, tint = colors.emerald)

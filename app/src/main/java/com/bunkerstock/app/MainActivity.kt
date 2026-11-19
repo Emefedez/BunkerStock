@@ -89,11 +89,18 @@ import com.bunkerstock.app.data.ExpiryNotificationHelper
 import com.bunkerstock.app.ui.BunkerTab
 import com.bunkerstock.app.ui.BunkerViewModel
 import com.bunkerstock.app.ui.components.AppUpdateDialog
+import com.bunkerstock.app.ui.components.BatchQrPdfDialog
 import com.bunkerstock.app.ui.components.ConfirmActionDialog
 import com.bunkerstock.app.ui.components.FamilyGroupDialog
+import com.bunkerstock.app.ui.components.FirstTimeSetupDialog
 import com.bunkerstock.app.ui.components.ItemEditorSheet
 import com.bunkerstock.app.ui.components.QrLabelDialog
 import com.bunkerstock.app.ui.components.QuickScanActionSheet
+import com.bunkerstock.app.scanner.QrCodeUtils
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.bunkerstock.app.ui.screens.ScannerScreen
 import com.bunkerstock.app.ui.screens.SettingsScreen
 import com.bunkerstock.app.ui.screens.WarehouseScreen
@@ -197,6 +204,9 @@ private fun BunkerStockApp(
     }
     var scannerUnlockCounter by remember { mutableIntStateOf(0) }
     var dataMenuExpanded by remember { mutableStateOf(false) }
+    var pendingBatchQrIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var isGeneratingBatchPdf by remember { mutableStateOf(false) }
+    val appScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         viewModel.toastEvents.collect { msg ->
@@ -247,6 +257,40 @@ private fun BunkerStockApp(
                 if (content != null) viewModel.importJsonText(content)
             }.onFailure {
                 viewModel.notifyMessage(strings.toastJsonInvalid)
+            }
+        }
+    }
+
+    val exportBatchPdfLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri ->
+        val ids = pendingBatchQrIds
+        if (uri != null && ids.isNotEmpty()) {
+            appScope.launch {
+                isGeneratingBatchPdf = true
+                val items = viewModel.prepareItemsForBatchQr(ids)
+                val ok = withContext(Dispatchers.IO) {
+                    runCatching {
+                        context.contentResolver.openOutputStream(uri)?.use { out ->
+                            QrCodeUtils.writeBatchQrPdf(
+                                items = items,
+                                outputStream = out,
+                                headerBrand = strings.qrHeaderBrand,
+                                notApplicableLabel = strings.notApplicable,
+                                expiredDays = state.settings.expiredThresholdDays,
+                                criticalDays = state.settings.criticalThresholdDays,
+                                warningDays = state.settings.warningThresholdDays
+                            )
+                        } ?: false
+                    }.getOrDefault(false)
+                }
+                isGeneratingBatchPdf = false
+                if (ok) {
+                    viewModel.closeBatchQrDialog()
+                    viewModel.notifyMessage(strings.toastBatchPdfSaved)
+                } else {
+                    viewModel.notifyMessage(strings.toastExportError)
+                }
             }
         }
     }
@@ -350,7 +394,7 @@ private fun BunkerStockApp(
                                     border = BorderStroke(1.dp, colors.borderSubtle)
                                 ) {
                                     Text(
-                                        text = "V3.0",
+                                        text = "V3.1",
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontFamily = FontFamily.Monospace,
                                             fontSize = 9.sp
@@ -411,6 +455,13 @@ private fun BunkerStockApp(
                                     expanded = dataMenuExpanded,
                                     onDismissRequest = { dataMenuExpanded = false }
                                 ) {
+                                    DropdownMenuItem(
+                                        text = { Text(strings.batchQrMenu, fontWeight = FontWeight.SemiBold) },
+                                        onClick = {
+                                            dataMenuExpanded = false
+                                            viewModel.openBatchQrDialog()
+                                        }
+                                    )
                                     DropdownMenuItem(
                                         text = { Text(strings.exportJson) },
                                         onClick = {
@@ -587,7 +638,9 @@ private fun BunkerStockApp(
                             isExpandedWidth = isExpandedWidth,
                             onSearchChange = viewModel::updateSearch,
                             onCategorySelect = viewModel::selectCategory,
+                            onToggleCategory = viewModel::toggleCategory,
                             onStatusSelect = viewModel::selectStatus,
+                            onToggleStatus = viewModel::toggleStatus,
                             onSortSelect = viewModel::selectSort,
                             onQuickFilterAlerts = viewModel::quickFilterAlerts,
                             onResetFilters = viewModel::resetFilters,
@@ -610,9 +663,11 @@ private fun BunkerStockApp(
                             onLanguageChange = viewModel::setLanguage,
                             onThemeModeChange = viewModel::setThemeMode,
                             onWaterConfigChange = viewModel::setWaterConfig,
+                            onExpiryThresholdsChange = viewModel::setExpiryThresholds,
                             onExpiryNotifChange = viewModel::setExpiryNotifications,
                             onAutoUpdateChange = viewModel::setAutoCheckUpdates,
                             onCheckUpdatesNow = { viewModel.checkForUpdates(silent = false) },
+                            onOpenBatchQr = viewModel::openBatchQrDialog,
                             onExportJson = ::triggerExportJson,
                             onExportCsv = ::triggerExportCsv,
                             onImportJson = ::triggerImportJson,
@@ -704,6 +759,53 @@ private fun BunkerStockApp(
             onSyncNow = { viewModel.syncFamilyNow(silent = false) },
             onLeaveGroup = viewModel::leaveFamilyGroup,
             onDismiss = viewModel::closeFamilyDialog
+        )
+    }
+
+    // Batch QR to Multi-Page A4 PDF Dialog
+    if (state.showBatchQrDialog) {
+        BatchQrPdfDialog(
+            items = state.inventory,
+            isBusy = isGeneratingBatchPdf,
+            onSavePdf = { ids ->
+                pendingBatchQrIds = ids
+                val date = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+                exportBatchPdfLauncher.launch("BunkerStock_QRs_$date.pdf")
+            },
+            onSharePdf = { ids ->
+                appScope.launch {
+                    isGeneratingBatchPdf = true
+                    val items = viewModel.prepareItemsForBatchQr(ids)
+                    val ok = withContext(Dispatchers.IO) {
+                        QrCodeUtils.shareBatchQrPdf(
+                            context = context,
+                            items = items,
+                            headerBrand = strings.qrHeaderBrand,
+                            notApplicableLabel = strings.notApplicable,
+                            expiredDays = state.settings.expiredThresholdDays,
+                            criticalDays = state.settings.criticalThresholdDays,
+                            warningDays = state.settings.warningThresholdDays
+                        )
+                    }
+                    isGeneratingBatchPdf = false
+                    if (ok) {
+                        viewModel.closeBatchQrDialog()
+                        viewModel.notifyMessage(strings.toastBatchPdfShared)
+                    } else {
+                        viewModel.notifyMessage(strings.toastExportError)
+                    }
+                }
+            },
+            onDismiss = viewModel::closeBatchQrDialog
+        )
+    }
+
+    // First-Time Setup Language Selection Dialog (Spanish / English)
+    if (!state.settings.onboardingCompleted) {
+        FirstTimeSetupDialog(
+            selectedLanguage = state.settings.language,
+            onLanguageSelect = viewModel::setLanguage,
+            onComplete = viewModel::completeOnboarding
         )
     }
 }

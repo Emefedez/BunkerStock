@@ -69,7 +69,12 @@ object ExpiryNotificationHelper {
         // Only confirmed items with an explicit expiry date entering CRITICAL (<=30d) or EXPIRED
         val dangerous = items.mapNotNull { item ->
             if (item.noExpiry || item.expiryDate.isBlank()) return@mapNotNull null
-            val info = InventoryLogic.getExpiryInfo(item)
+            val info = InventoryLogic.getExpiryInfo(
+                item,
+                expiredDays = settings.expiredThresholdDays,
+                criticalDays = settings.criticalThresholdDays,
+                warningDays = settings.warningThresholdDays
+            )
             if (info.status == ExpiryStatus.CRITICAL || info.status == ExpiryStatus.EXPIRED) {
                 Triple(item, info, "${item.id}:${info.status.name}")
             } else {

@@ -322,7 +322,7 @@ fun ScannerScreen(
                 }
             }
 
-            // Compact Overlaid Controls inside the viewfinder (top-right): Image QR, Switch Camera, Torch
+            // Compact Overlaid Controls inside the viewfinder (top-right) — fixed positions, zero layout shift
             Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -338,6 +338,19 @@ fun ScannerScreen(
                 )
                 if (hasCameraPermission && !cameraError) {
                     ViewfinderIconButton(
+                        icon = if (torchEnabled && hasFlashUnit) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                        contentDescription = strings.scannerTorch,
+                        tint = when {
+                            !hasFlashUnit -> Color.White.copy(alpha = 0.28f)
+                            torchEnabled -> Color(0xFF111312)
+                            else -> colors.amber
+                        },
+                        active = torchEnabled && hasFlashUnit,
+                        activeBg = colors.amber,
+                        enabled = hasFlashUnit,
+                        onClick = { if (hasFlashUnit) torchEnabled = !torchEnabled }
+                    )
+                    ViewfinderIconButton(
                         icon = Icons.Default.Cameraswitch,
                         contentDescription = strings.scannerSwitchCamera,
                         tint = Color.White,
@@ -347,16 +360,6 @@ fun ScannerScreen(
                             torchEnabled = false
                         }
                     )
-                    if (hasFlashUnit) {
-                        ViewfinderIconButton(
-                            icon = if (torchEnabled) Icons.Default.FlashOn else Icons.Default.FlashOff,
-                            contentDescription = strings.scannerTorch,
-                            tint = if (torchEnabled) Color(0xFF111312) else colors.amber,
-                            active = torchEnabled,
-                            activeBg = colors.amber,
-                            onClick = { torchEnabled = !torchEnabled }
-                        )
-                    }
                 }
             }
 
@@ -578,15 +581,20 @@ private fun ViewfinderIconButton(
     tint: Color,
     active: Boolean,
     activeBg: Color = Color(0xCC111312),
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     Surface(
         shape = RoundedCornerShape(BunkerRadius.Control),
-        color = if (active) activeBg else Color(0xBB111312),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+        color = when {
+            active -> activeBg
+            !enabled -> Color(0x77111312)
+            else -> Color(0xBB111312)
+        },
+        border = BorderStroke(1.dp, Color.White.copy(alpha = if (enabled) 0.2f else 0.08f)),
         modifier = Modifier.size(42.dp)
     ) {
-        IconButton(onClick = onClick, modifier = Modifier.fillMaxSize()) {
+        IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxSize()) {
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,

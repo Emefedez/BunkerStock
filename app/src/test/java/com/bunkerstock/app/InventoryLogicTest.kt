@@ -188,4 +188,44 @@ class InventoryLogicTest {
         assertEquals(10.0, a.qty, 0.01)
         assertEquals("/data/custom.jpg", a.imageUri)
     }
+
+    @Test
+    fun customExpiryThresholdsMultiFilterAndBatchQrPagingWork() {
+        val demo = InventoryLogic.getDefaultDemoData(fixedToday)
+        // With criticalDays = 60 and warningDays = 200, item-5 (55d) becomes CRITICAL and item-1 (180d) becomes WARNING
+        val item5 = demo.first { it.id == "item-5" }
+        val item1 = demo.first { it.id == "item-1" }
+        assertEquals(
+            ExpiryStatus.CRITICAL,
+            InventoryLogic.getExpiryInfo(item5, fixedToday, expiredDays = 0, criticalDays = 60, warningDays = 200).status
+        )
+        assertEquals(
+            ExpiryStatus.WARNING,
+            InventoryLogic.getExpiryInfo(item1, fixedToday, expiredDays = 0, criticalDays = 60, warningDays = 200).status
+        )
+        val metrics = InventoryLogic.computeDashboardMetrics(
+            items = demo,
+            today = fixedToday,
+            expiredDays = 0,
+            criticalDays = 60,
+            warningDays = 200
+        )
+        assertEquals(3, metrics.criticalCount) // item-2 (14d), item-8 (22d), item-5 (55d)
+
+        val multi = InventoryLogic.filterAndSortMulti(
+            items = demo,
+            query = "",
+            categories = setOf(ItemCategory.FOOD.storageKey, ItemCategory.WATER.storageKey),
+            statuses = setOf(StatusFilter.EXPIRED, StatusFilter.CRITICAL),
+            sortOption = SortOption.EXPIRY_ASC,
+            today = fixedToday
+        )
+        assertEquals(2, multi.size) // item-3 (expired food) + item-2 (critical food)
+
+        assertEquals(0, com.bunkerstock.app.scanner.QrCodeUtils.batchPageCount(0))
+        assertEquals(1, com.bunkerstock.app.scanner.QrCodeUtils.batchPageCount(1))
+        assertEquals(1, com.bunkerstock.app.scanner.QrCodeUtils.batchPageCount(24))
+        assertEquals(2, com.bunkerstock.app.scanner.QrCodeUtils.batchPageCount(25))
+        assertEquals(3, com.bunkerstock.app.scanner.QrCodeUtils.batchPageCount(49))
+    }
 }

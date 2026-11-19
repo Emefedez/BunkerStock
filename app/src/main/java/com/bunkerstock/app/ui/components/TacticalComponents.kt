@@ -1,7 +1,9 @@
 package com.bunkerstock.app.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -108,10 +110,12 @@ fun expiryColors(status: ExpiryStatus): Pair<Color, Color> {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CriticalAlertBanner(
     expiredCount: Int,
     criticalCount: Int,
+    criticalDays: Int = 30,
     onReviewClick: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
@@ -124,7 +128,12 @@ fun CriticalAlertBanner(
             add(if (expiredCount == 1) strings.alertExpiredSingle else strings.alertExpiredPlural(expiredCount))
         }
         if (criticalCount > 0) {
-            add(if (criticalCount == 1) strings.alertCriticalSingle else strings.alertCriticalPlural(criticalCount))
+            val critText = if (strings.language == com.bunkerstock.app.data.AppLanguage.ES) {
+                if (criticalCount == 1) "1 próximo a caducar (<${criticalDays}d)" else "$criticalCount próximos a caducar (<${criticalDays}d)"
+            } else {
+                if (criticalCount == 1) "1 expiring soon (<${criticalDays}d)" else "$criticalCount expiring soon (<${criticalDays}d)"
+            }
+            add(critText)
         }
     }
     val title = "${strings.alertRotationPrefix} ${parts.joinToString(strings.alertJoinAnd)}"
@@ -160,7 +169,12 @@ fun CriticalAlertBanner(
             Row(
                 modifier = Modifier
                     .weight(1f)
-                    .horizontalScroll(rememberScrollState()),
+                    .basicMarquee(
+                        iterations = Int.MAX_VALUE,
+                        initialDelayMillis = 1000,
+                        repeatDelayMillis = 1200,
+                        velocity = 36.dp
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -302,6 +316,8 @@ fun KpiCard(
 @Composable
 fun WarehouseHealthBar(
     metrics: DashboardMetrics,
+    criticalDays: Int = 30,
+    warningDays: Int = 90,
     modifier: Modifier = Modifier
 ) {
     val strings = LocalAppStrings.current
@@ -410,10 +426,10 @@ fun WarehouseHealthBar(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     LegendDot(colors.emerald, strings.legendOptimal, Modifier.weight(1f))
-                    LegendDot(colors.warning, strings.legendWarning, Modifier.weight(1f))
+                    LegendDot(colors.warning, strings.legendWarningDynamic(criticalDays, warningDays), Modifier.weight(1f))
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    LegendDot(colors.amber, strings.legendCritical, Modifier.weight(1f))
+                    LegendDot(colors.amber, strings.legendCriticalDynamic(criticalDays), Modifier.weight(1f))
                     LegendDot(colors.danger, strings.legendExpired, Modifier.weight(1f))
                 }
             }
@@ -594,8 +610,96 @@ fun ProductThumbnail(
 }
 
 @Composable
+fun ScoreColumn(
+    nutrition: ProductNutrition?,
+    modifier: Modifier = Modifier
+) {
+    val colors = LocalBunkerColors.current
+    val grade = nutrition?.nutriScoreGrade?.uppercase()
+    val yuka = nutrition?.healthScore
+
+    if (grade == null && yuka == null) return
+
+    val gradeBg = when (grade) {
+        "A" -> Color(0xFF17823B)
+        "B" -> Color(0xFF73A92D)
+        "C" -> Color(0xFFD0A514)
+        "D" -> Color(0xFFD16D16)
+        "E" -> Color(0xFFBD2B24)
+        else -> colors.cardElevated
+    }
+
+    val yukaColor = when {
+        yuka == null -> colors.mutedText
+        yuka >= 75 -> Color(0xFF17823B)
+        yuka >= 50 -> Color(0xFF73A92D)
+        yuka >= 25 -> Color(0xFFD16D16)
+        else -> Color(0xFFBD2B24)
+    }
+
+    Column(
+        modifier = modifier.width(44.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        // Nutri-Score square badge (YsiFoods style)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(26.dp)
+                .clip(RoundedCornerShape(BunkerRadius.Control))
+                .background(gradeBg),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = grade ?: "?",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 14.sp
+                ),
+                color = if (grade != null) Color.White else colors.mutedText
+            )
+        }
+
+        // Yuka-style 0-100 health score badge stacked right underneath
+        if (yuka != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(BunkerRadius.Badge))
+                    .background(yukaColor.copy(alpha = 0.16f))
+                    .border(1.dp, yukaColor.copy(alpha = 0.55f), RoundedCornerShape(BunkerRadius.Badge))
+                    .padding(horizontal = 4.dp, vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(yukaColor)
+                )
+                Spacer(Modifier.width(3.dp))
+                Text(
+                    text = yuka.toString(),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 10.5.sp
+                    ),
+                    color = yukaColor
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun InventoryItemCard(
     item: InventoryItem,
+    expiredDays: Int = 0,
+    criticalDays: Int = 30,
+    warningDays: Int = 90,
     onDecrement: () -> Unit,
     onIncrement: () -> Unit,
     onQrClick: () -> Unit,
@@ -605,7 +709,13 @@ fun InventoryItemCard(
 ) {
     val strings = LocalAppStrings.current
     val colors = LocalBunkerColors.current
-    val info = InventoryLogic.getExpiryInfo(item, notApplicableLabel = strings.notApplicable)
+    val info = InventoryLogic.getExpiryInfo(
+        item = item,
+        notApplicableLabel = strings.notApplicable,
+        expiredDays = expiredDays,
+        criticalDays = criticalDays,
+        warningDays = warningDays
+    )
     val category = ItemCategory.fromKey(item.category)
     val unit = ItemUnit.fromKey(item.unit)
     val (catIcon, catFg, catBg) = categoryStyle(category)
@@ -617,248 +727,209 @@ fun InventoryItemCard(
     }
 
     val rowBg = when (info.status) {
-        ExpiryStatus.EXPIRED -> colors.dangerContainer.copy(alpha = 0.25f)
-        ExpiryStatus.CRITICAL -> colors.amberContainer.copy(alpha = 0.20f)
-        else -> Color.Transparent
+        ExpiryStatus.EXPIRED -> colors.dangerContainer.copy(alpha = 0.32f)
+        ExpiryStatus.CRITICAL -> colors.amberContainer.copy(alpha = 0.25f)
+        else -> colors.cardSurface.copy(alpha = 0.58f)
     }
 
-    // Flat editorial list row with subtle left status bar & bottom hairline (zero card-box clutter)
+    // Compact list row with subtle vertical spacing between items, YsiFoods Nutri-Score + Yuka column on right
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 3.dp)
+            .clip(RoundedCornerShape(BunkerRadius.Control))
             .background(rowBg)
+            .border(1.dp, colors.borderSubtle.copy(alpha = 0.55f), RoundedCornerShape(BunkerRadius.Control))
     ) {
         Row(modifier = Modifier.fillMaxWidth()) {
             if (accentBar != Color.Transparent) {
                 Box(
                     modifier = Modifier
                         .width(3.dp)
-                        .height(140.dp)
+                        .height(104.dp)
                         .background(accentBar)
                 )
             }
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-            // Top badges: Category + Expiry Status
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+                // Compact top row: Thumbnail + Name/Meta + Right stacked Nutri-Score & Yuka score
                 Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(catBg)
-                        .border(1.dp, catFg.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.Top
                 ) {
-                    Icon(
-                        imageVector = catIcon,
-                        contentDescription = null,
-                        tint = catFg,
-                        modifier = Modifier.size(13.dp)
+                    ProductThumbnail(
+                        imageSource = item.imageUri ?: item.nutrition?.imageUrl,
+                        category = category,
+                        barcode = item.barcode,
+                        productName = item.name,
+                        size = 48.dp
                     )
-                    Text(
-                        text = strings.categoryLabel(category),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = catFg
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                StatusBadge(info = info)
-            }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(BunkerRadius.Badge))
+                                    .background(catBg)
+                                    .padding(horizontal = 5.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Icon(
+                                    imageVector = catIcon,
+                                    contentDescription = null,
+                                    tint = catFg,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Text(
+                                    text = strings.categoryLabel(category),
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    color = catFg
+                                )
+                            }
+                            StatusBadge(info = info)
+                        }
 
-            // Item thumbnail + name + metadata
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.Top
-            ) {
-                ProductThumbnail(
-                    imageSource = item.imageUri ?: item.nutrition?.imageUrl,
-                    category = category,
-                    barcode = item.barcode,
-                    productName = item.name,
-                    size = 54.dp
-                )
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = item.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(
-                            imageVector = Icons.Default.CalendarMonth,
-                            contentDescription = null,
-                            tint = colors.mutedText,
-                            modifier = Modifier.size(14.dp)
-                        )
                         Text(
-                            text = "${strings.expiryLabel} ${info.formattedDate}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = item.name,
+                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 14.5.sp),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
-                    }
-                    if (item.barcode.isNotBlank()) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Icon(
-                                imageVector = Icons.Default.QrCodeScanner,
-                                contentDescription = null,
-                                tint = colors.amber,
-                                modifier = Modifier.size(14.dp)
-                            )
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Text(
-                                text = item.barcode,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = colors.amber
+                                text = info.formattedDate,
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.5.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            if (item.location.isNotBlank()) {
+                                Text(
+                                    text = "· ${item.location}",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 11.sp),
+                                    color = colors.mutedText,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
-                    if (item.location.isNotBlank()) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = null,
-                                tint = colors.mutedText,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Text(
-                                text = item.location,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = colors.mutedText
-                            )
-                        }
-                    }
-                    if (item.notes.isNotBlank()) {
-                        Text(
-                            text = "\"${item.notes}\"",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
-                            color = colors.mutedText
-                        )
-                    }
-                    item.nutrition?.let { nut ->
-                        Spacer(Modifier.height(4.dp))
-                        NutritionBadgesRow(nutrition = nut)
-                    }
+
+                    // Right-aligned stacked Nutri-Score + Yuka health score (YsiFoods style)
+                    ScoreColumn(nutrition = item.nutrition)
                 }
-            }
 
-            // Divider & Bottom Action Row (48dp touch targets)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(colors.borderSubtle.copy(alpha = 0.6f))
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Tactile - qty + stepper
+                // Compact action bar: - qty + stepper & QR / Edit / Delete
                 Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(BunkerRadius.Control))
-                        .background(colors.canvas)
-                        .border(1.dp, colors.borderSubtle, RoundedCornerShape(BunkerRadius.Control))
-                        .padding(horizontal = 2.dp, vertical = 2.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(
-                        onClick = onDecrement,
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Remove,
-                            contentDescription = strings.subtractOne,
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                    Row(
                         modifier = Modifier
-                            .widthIn(min = 64.dp)
-                            .padding(horizontal = 4.dp)
+                            .clip(RoundedCornerShape(BunkerRadius.Control))
+                            .background(colors.canvas)
+                            .border(1.dp, colors.borderSubtle, RoundedCornerShape(BunkerRadius.Control)),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = InventoryLogic.formatQty(item.qty),
-                            style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace),
-                            color = if (item.qty <= 0.0) colors.danger else MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = strings.unitLabel(unit),
-                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 11.sp),
-                            color = colors.mutedText,
-                            maxLines = 1
-                        )
+                        IconButton(
+                            onClick = onDecrement,
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Remove,
+                                contentDescription = strings.subtractOne,
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(horizontal = 6.dp)
+                        ) {
+                            Text(
+                                text = InventoryLogic.formatQty(item.qty),
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 14.sp
+                                ),
+                                color = if (item.qty <= 0.0) colors.danger else MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = strings.unitLabel(unit),
+                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 11.sp),
+                                color = colors.mutedText,
+                                maxLines = 1
+                            )
+                        }
+                        IconButton(
+                            onClick = onIncrement,
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = strings.addOne,
+                                tint = colors.emerald,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
-                    IconButton(
-                        onClick = onIncrement,
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = strings.addOne,
-                            tint = colors.emerald
-                        )
-                    }
-                }
 
-                // QR / Edit / Delete action buttons (48dp targets)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = onQrClick,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .semantics { contentDescription = strings.qrLabelAction }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.QrCode2,
-                            contentDescription = strings.qrLabelAction,
-                            tint = colors.amber
-                        )
-                    }
-                    IconButton(
-                        onClick = onEditClick,
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = strings.editAction,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    IconButton(
-                        onClick = onDeleteClick,
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DeleteOutline,
-                            contentDescription = strings.deleteAction,
-                            tint = colors.danger
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = onQrClick,
+                            modifier = Modifier
+                                .size(38.dp)
+                                .semantics { contentDescription = strings.qrLabelAction }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.QrCode2,
+                                contentDescription = strings.qrLabelAction,
+                                tint = colors.amber,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = onEditClick,
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = strings.editAction,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = onDeleteClick,
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteOutline,
+                                contentDescription = strings.deleteAction,
+                                tint = colors.danger,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }
         }
-        }
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(colors.borderSubtle.copy(alpha = 0.7f))
-        )
     }
 }
 

@@ -44,7 +44,7 @@ data class FamilyGroupConfig(
     val secretKey: String = "",
     val groupName: String = "",
     val memberName: String = "",
-    val serverBaseUrl: String = "https://api.restful-api.dev/objects",
+    val serverBaseUrl: String = FamilySyncClient.DEFAULT_SERVER,
     val lastSyncedAt: Long = 0L
 ) {
     val isJoined: Boolean get() = roomId.isNotBlank() && secretKey.isNotBlank()
@@ -159,7 +159,11 @@ data class AppSettings(
     val waterPersons: Int = 2,
     val waterLitersPerPersonDay: Int = 3,
     val autoCheckUpdates: Boolean = true,
-    val expiryNotificationsEnabled: Boolean = true
+    val expiryNotificationsEnabled: Boolean = true,
+    val expiredThresholdDays: Int = 0,
+    val criticalThresholdDays: Int = 30,
+    val warningThresholdDays: Int = 90,
+    val onboardingCompleted: Boolean = true
 )
 
 data class ItemPrefill(

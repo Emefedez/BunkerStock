@@ -58,8 +58,8 @@ data class BunkerUiState(
     val metrics: DashboardMetrics = DashboardMetrics(),
     val settings: AppSettings = AppSettings(),
     val searchQuery: String = "",
-    val selectedCategory: String? = null,
-    val selectedStatus: StatusFilter = StatusFilter.ALL,
+    val selectedCategories: Set<String> = emptySet(),
+    val selectedStatuses: Set<StatusFilter> = emptySet(),
     val sortOption: SortOption = SortOption.EXPIRY_ASC,
     val bannerDismissed: Boolean = false,
     val activeTab: BunkerTab = BunkerTab.WAREHOUSE,
@@ -71,6 +71,7 @@ data class BunkerUiState(
     val detectedCandidate: DetectedScanCandidate? = null,
     val quickScanItemId: String? = null,
     val qrLabelItemId: String? = null,
+    val showBatchQrDialog: Boolean = false,
     val pendingConfirm: PendingConfirm? = null,
     val availableUpdate: AppUpdateInfo? = null,
     val isDownloadingUpdate: Boolean = false,
@@ -79,7 +80,10 @@ data class BunkerUiState(
     val showFamilyDialog: Boolean = false
 ) {
     val hasActiveFilters: Boolean
-        get() = searchQuery.isNotBlank() || selectedCategory != null || selectedStatus != StatusFilter.ALL
+        get() = searchQuery.isNotBlank() || selectedCategories.isNotEmpty() || selectedStatuses.isNotEmpty()
+
+    val activeFilterCount: Int
+        get() = selectedCategories.size + selectedStatuses.size
 
     val quickScanItem: InventoryItem?
         get() = quickScanItemId?.let { id -> inventory.firstOrNull { it.id == id } }
@@ -93,8 +97,8 @@ data class BunkerUiState(
 
 private data class LocalUiFilters(
     val searchQuery: String = "",
-    val selectedCategory: String? = null,
-    val selectedStatus: StatusFilter = StatusFilter.ALL,
+    val selectedCategories: Set<String> = emptySet(),
+    val selectedStatuses: Set<StatusFilter> = emptySet(),
     val sortOption: SortOption = SortOption.EXPIRY_ASC,
     val bannerDismissed: Boolean = false,
     val activeTab: BunkerTab = BunkerTab.WAREHOUSE
@@ -109,6 +113,7 @@ private data class ModalState(
     val detectedCandidate: DetectedScanCandidate? = null,
     val quickScanItemId: String? = null,
     val qrLabelItemId: String? = null,
+    val showBatchQrDialog: Boolean = false,
     val pendingConfirm: PendingConfirm? = null,
     val availableUpdate: AppUpdateInfo? = null,
     val isDownloadingUpdate: Boolean = false,
@@ -135,14 +140,20 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
         val metrics = InventoryLogic.computeDashboardMetrics(
             items = inventory,
             persons = settings.waterPersons,
-            litersPerPersonDay = settings.waterLitersPerPersonDay
+            litersPerPersonDay = settings.waterLitersPerPersonDay,
+            expiredDays = settings.expiredThresholdDays,
+            criticalDays = settings.criticalThresholdDays,
+            warningDays = settings.warningThresholdDays
         )
-        val filtered = InventoryLogic.filterAndSort(
+        val filtered = InventoryLogic.filterAndSortMulti(
             items = inventory,
             query = filters.searchQuery,
-            categoryFilter = filters.selectedCategory,
-            statusFilter = filters.selectedStatus,
-            sortOption = filters.sortOption
+            categories = filters.selectedCategories,
+            statuses = filters.selectedStatuses,
+            sortOption = filters.sortOption,
+            expiredDays = settings.expiredThresholdDays,
+            criticalDays = settings.criticalThresholdDays,
+            warningDays = settings.warningThresholdDays
         )
         BunkerUiState(
             inventory = inventory,
@@ -150,8 +161,8 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
             metrics = metrics,
             settings = settings,
             searchQuery = filters.searchQuery,
-            selectedCategory = filters.selectedCategory,
-            selectedStatus = filters.selectedStatus,
+            selectedCategories = filters.selectedCategories,
+            selectedStatuses = filters.selectedStatuses,
             sortOption = filters.sortOption,
             bannerDismissed = filters.bannerDismissed,
             activeTab = filters.activeTab,
@@ -163,6 +174,7 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
             detectedCandidate = modals.detectedCandidate,
             quickScanItemId = modals.quickScanItemId,
             qrLabelItemId = modals.qrLabelItemId,
+            showBatchQrDialog = modals.showBatchQrDialog,
             pendingConfirm = modals.pendingConfirm,
             availableUpdate = modals.availableUpdate,
             isDownloadingUpdate = modals.isDownloadingUpdate,
@@ -212,11 +224,36 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun selectCategory(category: String?) {
-        filtersFlow.update { it.copy(selectedCategory = category) }
+        filtersFlow.update {
+            it.copy(selectedCategories = if (category == null) emptySet() else setOf(category))
+        }
+    }
+
+    fun toggleCategory(category: String) {
+        filtersFlow.update { current ->
+            val next = current.selectedCategories.toMutableSet()
+            val existing = next.firstOrNull { it.equals(category, ignoreCase = true) }
+            if (existing != null) next.remove(existing) else next.add(category)
+            current.copy(selectedCategories = next)
+        }
     }
 
     fun selectStatus(status: StatusFilter) {
-        filtersFlow.update { it.copy(selectedStatus = status) }
+        filtersFlow.update {
+            it.copy(selectedStatuses = if (status == StatusFilter.ALL) emptySet() else setOf(status))
+        }
+    }
+
+    fun toggleStatus(status: StatusFilter) {
+        if (status == StatusFilter.ALL) {
+            filtersFlow.update { it.copy(selectedStatuses = emptySet()) }
+            return
+        }
+        filtersFlow.update { current ->
+            val next = current.selectedStatuses.toMutableSet()
+            if (next.contains(status)) next.remove(status) else next.add(status)
+            current.copy(selectedStatuses = next)
+        }
     }
 
     fun selectSort(sort: SortOption) {
@@ -227,8 +264,8 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
         filtersFlow.update {
             it.copy(
                 activeTab = BunkerTab.WAREHOUSE,
-                selectedCategory = null,
-                selectedStatus = StatusFilter.ALERT_ALL,
+                selectedCategories = emptySet(),
+                selectedStatuses = setOf(StatusFilter.ALERT_ALL),
                 sortOption = SortOption.EXPIRY_ASC
             )
         }
@@ -238,8 +275,8 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
         filtersFlow.update {
             it.copy(
                 searchQuery = "",
-                selectedCategory = null,
-                selectedStatus = StatusFilter.ALL,
+                selectedCategories = emptySet(),
+                selectedStatuses = emptySet(),
                 sortOption = SortOption.EXPIRY_ASC
             )
         }
@@ -600,6 +637,46 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
         modalFlow.update { it.copy(qrLabelItemId = null) }
     }
 
+    fun openBatchQrDialog() {
+        modalFlow.update { it.copy(showBatchQrDialog = true) }
+    }
+
+    fun closeBatchQrDialog() {
+        modalFlow.update { it.copy(showBatchQrDialog = false) }
+    }
+
+    /**
+     * Ensures every selected item has a barcode (generates BNK-XXXXXX if missing),
+     * persists any newly generated codes, and returns the resolved items in list order.
+     */
+    suspend fun prepareItemsForBatchQr(selectedIds: Set<String>): List<InventoryItem> {
+        val current = uiState.value.inventory.toMutableList()
+        var mutated = false
+        val baseTs = System.currentTimeMillis()
+        var seq = 0
+        val resolved = mutableListOf<InventoryItem>()
+        for (i in current.indices) {
+            val item = current[i]
+            if (selectedIds.contains(item.id)) {
+                if (item.barcode.isBlank()) {
+                    val code = "BNK-" + ((baseTs + seq) % 1_000_000L).toString().padStart(6, '0')
+                    seq++
+                    val updated = item.copy(barcode = code, updatedAt = baseTs)
+                    current[i] = updated
+                    resolved.add(updated)
+                    mutated = true
+                } else {
+                    resolved.add(item)
+                }
+            }
+        }
+        if (mutated) {
+            repository.saveInventory(current)
+            if (uiState.value.familyGroup.isJoined) syncFamilyNow(silent = true)
+        }
+        return resolved
+    }
+
     // Export / Import
     fun buildJsonExport(): String = InventoryLogic.exportToJson(uiState.value.inventory)
 
@@ -632,12 +709,23 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch { repository.updateLanguage(language) }
     }
 
+    fun completeOnboarding() {
+        viewModelScope.launch { repository.markOnboardingCompleted() }
+    }
+
     fun setThemeMode(mode: AppThemeMode) {
         viewModelScope.launch { repository.updateThemeMode(mode) }
     }
 
     fun setWaterConfig(persons: Int, litersPerDay: Int) {
         viewModelScope.launch { repository.updateWaterConfig(persons, litersPerDay) }
+    }
+
+    fun setExpiryThresholds(expiredDays: Int, criticalDays: Int, warningDays: Int) {
+        viewModelScope.launch {
+            repository.updateExpiryThresholds(expiredDays, criticalDays, warningDays)
+            ExpiryNotificationHelper.evaluateAndNotify(getApplication(), repository)
+        }
     }
 
     fun setAutoCheckUpdates(enabled: Boolean) {

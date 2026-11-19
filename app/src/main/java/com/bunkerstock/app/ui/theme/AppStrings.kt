@@ -252,8 +252,63 @@ data class AppStrings(
     val toastFamilyLeft: String,
     val toastInviteInvalid: String,
     val settingsExpiryNotif: String,
-    val settingsExpiryNotifSub: String
+    val settingsExpiryNotifSub: String,
+    val settingsSectionThresholds: String,
+    val thresholdExpiredDays: String,
+    val thresholdCriticalDays: String,
+    val thresholdWarningDays: String,
+    val filterButtonLabel: String,
+    val filterCategoriesHeader: String,
+    val filterStatusHeader: String,
+    val batchQrMenu: String,
+    val batchQrMenuSub: String,
+    val batchQrTitle: String,
+    val batchQrSubtitle: String,
+    val batchQrSelectAll: String,
+    val batchQrDeselectAll: String,
+    val batchQrSummary: (Int, Int) -> String,
+    val batchQrSavePdf: String,
+    val batchQrSharePdf: String,
+    val toastBatchPdfSaved: String,
+    val toastBatchPdfShared: String,
+    val setupWelcomeSubtitle: String,
+    val setupContinue: String
 ) {
+    fun kpiCriticalTitle(criticalDays: Int): String = when (language) {
+        AppLanguage.ES -> "PRÓX. $criticalDays DÍAS"
+        AppLanguage.EN -> "NEXT $criticalDays DAYS"
+    }
+
+    fun legendWarningDynamic(criticalDays: Int, warningDays: Int): String = when (language) {
+        AppLanguage.ES -> "Precaución (${criticalDays + 1}-${warningDays}d)"
+        AppLanguage.EN -> "Caution (${criticalDays + 1}-${warningDays}d)"
+    }
+
+    fun legendCriticalDynamic(criticalDays: Int): String = when (language) {
+        AppLanguage.ES -> "Crítico (≤${criticalDays}d)"
+        AppLanguage.EN -> "Critical (≤${criticalDays}d)"
+    }
+
+    fun statusFilterLabelDynamic(filter: StatusFilter, criticalDays: Int, warningDays: Int): String = when (language) {
+        AppLanguage.ES -> when (filter) {
+            StatusFilter.ALL -> "Todos"
+            StatusFilter.ALERT_ALL -> "Alertas (Cad. + Crít.)"
+            StatusFilter.EXPIRED -> "Caducados"
+            StatusFilter.CRITICAL -> "Críticos (≤ ${criticalDays}d)"
+            StatusFilter.WARNING -> "Precaución (${criticalDays + 1}-${warningDays}d)"
+            StatusFilter.OPTIMAL -> "Óptimos (> ${warningDays}d)"
+            StatusFilter.NONE -> "Sin caducidad"
+        }
+        AppLanguage.EN -> when (filter) {
+            StatusFilter.ALL -> "All"
+            StatusFilter.ALERT_ALL -> "Alerts (Exp. + Crit.)"
+            StatusFilter.EXPIRED -> "Expired"
+            StatusFilter.CRITICAL -> "Critical (≤ ${criticalDays}d)"
+            StatusFilter.WARNING -> "Caution (${criticalDays + 1}-${warningDays}d)"
+            StatusFilter.OPTIMAL -> "Optimal (> ${warningDays}d)"
+            StatusFilter.NONE -> "No expiry"
+        }
+    }
     fun safetyFlagLabel(flag: String): String = when (flag) {
         "HIGH_SUGAR" -> flagHighSugar
         "HIGH_SALT" -> flagHighSalt
@@ -519,7 +574,7 @@ val SpanishStrings = AppStrings(
     clearAll = "Vaciar todo el almacén",
     clearAllSub = "Elimina permanentemente todos los registros",
     settingsSectionAbout = "ACERCA DE",
-    aboutDesc = "BunkerStock v3.0 · Control logístico familiar de inventario, salud nutricional y caducidad con sincronización cifrada.",
+    aboutDesc = "BunkerStock v3.1 · Control logístico familiar de inventario, salud nutricional y caducidad con sincronización cifrada.",
     confirmDeleteTitle = "Eliminar Artículo",
     confirmDeleteMsg = { "¿Seguro que deseas eliminar \"$it\" del inventario?" },
     confirmDemoTitle = "Restaurar Datos de Ejemplo",
@@ -599,7 +654,27 @@ val SpanishStrings = AppStrings(
     toastFamilyLeft = "Has salido del grupo familiar",
     toastInviteInvalid = "Enlace o QR de grupo no válido",
     settingsExpiryNotif = "Notificaciones de caducidad",
-    settingsExpiryNotifSub = "Avisa cuando un producto confirmado entra en rango peligroso (≤30 días)"
+    settingsExpiryNotifSub = "Avisa cuando un producto confirmado entra en rango peligroso",
+    settingsSectionThresholds = "UMBRALES DE CADUCIDAD (DÍAS)",
+    thresholdExpiredDays = "Caducado (días antes)",
+    thresholdCriticalDays = "Crítico (≤ días)",
+    thresholdWarningDays = "Precaución (≤ días)",
+    filterButtonLabel = "Filtrar",
+    filterCategoriesHeader = "CATEGORÍAS",
+    filterStatusHeader = "ESTADO DE CADUCIDAD",
+    batchQrMenu = "Batch QR (PDF A4)",
+    batchQrMenuSub = "Selecciona productos y genera un PDF A4 listo para imprimir (24 QRs/hoja)",
+    batchQrTitle = "Batch QR · PDF A4",
+    batchQrSubtitle = "Elige los artículos a incluir. Caben 24 etiquetas escaneables por hoja A4 y se añaden páginas automáticamente.",
+    batchQrSelectAll = "Seleccionar todos",
+    batchQrDeselectAll = "Quitar todos",
+    batchQrSummary = { count, pages -> "$count selec. · $pages pág. A4" },
+    batchQrSavePdf = "Guardar PDF",
+    batchQrSharePdf = "Compartir PDF",
+    toastBatchPdfSaved = "PDF de etiquetas QR guardado",
+    toastBatchPdfShared = "PDF de etiquetas QR listo para compartir",
+    setupWelcomeSubtitle = "Elige tu idioma preferido. Podrás cambiarlo en cualquier momento desde Ajustes.",
+    setupContinue = "Comenzar"
 )
 
 val EnglishStrings = AppStrings(
@@ -744,7 +819,7 @@ val EnglishStrings = AppStrings(
     clearAll = "Clear all inventory",
     clearAllSub = "Permanently deletes all records",
     settingsSectionAbout = "ABOUT",
-    aboutDesc = "BunkerStock v3.0 · Family logistics, product health scoring & expiry control with E2E encrypted sync.",
+    aboutDesc = "BunkerStock v3.1 · Family logistics, product health scoring & expiry control with E2E encrypted sync.",
     confirmDeleteTitle = "Delete Item",
     confirmDeleteMsg = { "Are you sure you want to delete \"$it\" from inventory?" },
     confirmDemoTitle = "Restore Sample Data",
@@ -824,7 +899,27 @@ val EnglishStrings = AppStrings(
     toastFamilyLeft = "Left family group",
     toastInviteInvalid = "Invalid family invite link or QR",
     settingsExpiryNotif = "Expiry notifications",
-    settingsExpiryNotifSub = "Alerts when a confirmed item enters the dangerous range (≤30 days)"
+    settingsExpiryNotifSub = "Alerts when a confirmed item enters the dangerous range",
+    settingsSectionThresholds = "EXPIRY THRESHOLDS (DAYS)",
+    thresholdExpiredDays = "Expired margin (days before)",
+    thresholdCriticalDays = "Critical (≤ days)",
+    thresholdWarningDays = "Caution (≤ days)",
+    filterButtonLabel = "Filter",
+    filterCategoriesHeader = "CATEGORIES",
+    filterStatusHeader = "EXPIRY STATUS",
+    batchQrMenu = "Batch QR (A4 PDF)",
+    batchQrMenuSub = "Pick products and generate a print-ready A4 PDF (24 QRs/page)",
+    batchQrTitle = "Batch QR · A4 PDF",
+    batchQrSubtitle = "Select items to print. Fits 24 scannable QR labels per A4 sheet and flows to extra pages automatically.",
+    batchQrSelectAll = "Select all",
+    batchQrDeselectAll = "Clear all",
+    batchQrSummary = { count, pages -> "$count selected · $pages A4 pg." },
+    batchQrSavePdf = "Save PDF",
+    batchQrSharePdf = "Share PDF",
+    toastBatchPdfSaved = "Batch QR PDF saved",
+    toastBatchPdfShared = "Batch QR PDF ready to share",
+    setupWelcomeSubtitle = "Choose your preferred language. You can change this anytime in Settings.",
+    setupContinue = "Continue"
 )
 
 fun stringsFor(language: AppLanguage): AppStrings = when (language) {
