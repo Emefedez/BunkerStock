@@ -607,7 +607,7 @@ object SpanishStrings : AppStrings {
     override val clearAll = "Vaciar todo el almacén"
     override val clearAllSub = "Elimina permanentemente todos los registros"
     override val settingsSectionAbout = "ACERCA DE"
-    override val aboutDesc = "BunkerStock v3.2 · Control logístico familiar de inventario, salud nutricional y caducidad con sincronización cifrada."
+    override val aboutDesc = "BunkerStock v3.3 · Control logístico familiar de inventario, salud nutricional y caducidad con sincronización cifrada."
     override val confirmDeleteTitle = "Eliminar Artículo"
     override val confirmDeleteMsg: (String) -> String = { "¿Seguro que deseas eliminar \"$it\" del inventario?" }
     override val confirmDemoTitle = "Restaurar Datos de Ejemplo"
@@ -881,7 +881,7 @@ object EnglishStrings : AppStrings {
     override val clearAll = "Clear all inventory"
     override val clearAllSub = "Permanently deletes all records"
     override val settingsSectionAbout = "ABOUT"
-    override val aboutDesc = "BunkerStock v3.2 · Family logistics, product health scoring & expiry control with E2E encrypted sync."
+    override val aboutDesc = "BunkerStock v3.3 · Family logistics, product health scoring & expiry control with E2E encrypted sync."
     override val confirmDeleteTitle = "Delete Item"
     override val confirmDeleteMsg: (String) -> String = { "Are you sure you want to delete \"$it\" from inventory?" }
     override val confirmDemoTitle = "Restore Sample Data"

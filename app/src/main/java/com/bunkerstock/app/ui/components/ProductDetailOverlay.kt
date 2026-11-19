@@ -1347,7 +1347,7 @@ private fun FullscreenZoomablePhotoViewer(
 }
 
 /**
- * YsiFoods-style Nutri-Score card: iconic circular grade badge + 5-grade YsiFoods bar with smooth entrance animation.
+ * Nutri-Score card: A-E rounded-square strip, active grade enlarged with white outline.
  */
 @Composable
 private fun YsiFoodsNutriScoreCard(
@@ -1359,10 +1359,10 @@ private fun YsiFoodsNutriScoreCard(
 ) {
     val colors = LocalBunkerColors.current
     val upper = grade?.uppercase()
-    val badgeScale by animateFloatAsState(
-        targetValue = if (animateIn) 1f else 0.72f,
+    val pop by animateFloatAsState(
+        targetValue = if (animateIn) 1f else 0.7f,
         animationSpec = tween(durationMillis = 480, easing = FastOutSlowInEasing),
-        label = "nutriScale"
+        label = "nutriPop"
     )
     val grades = listOf(
         "A" to Color(0xFF17823B),
@@ -1371,7 +1371,6 @@ private fun YsiFoodsNutriScoreCard(
         "D" to Color(0xFFD16D16),
         "E" to Color(0xFFBD2B24)
     )
-    val activeBg = grades.firstOrNull { it.first == upper }?.second ?: colors.cardElevated
 
     Column(
         modifier = modifier
@@ -1388,54 +1387,44 @@ private fun YsiFoodsNutriScoreCard(
             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
             color = colors.mutedText
         )
-
         if (upper != null) {
-            Box(
-                modifier = Modifier
-                    .scale(badgeScale)
-                    .size(46.dp)
-                    .clip(CircleShape)
-                    .background(activeBg)
-                    .border(2.dp, Color.White.copy(alpha = 0.85f), CircleShape),
-                contentAlignment = Alignment.Center
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
             ) {
-                Text(
-                    text = upper,
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        fontWeight = FontWeight.Black,
-                        fontSize = 22.sp
-                    ),
-                    color = Color.White
-                )
-            }
-
-            // Compact YsiFoods A-E indicator dots underneath
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 grades.forEach { (letter, bg) ->
                     val active = letter == upper
                     Box(
                         modifier = Modifier
-                            .size(width = if (active) 16.dp else 10.dp, height = 5.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(if (active) bg else bg.copy(alpha = 0.3f))
-                    )
+                            .scale(if (active) pop else 1f)
+                            .size(width = if (active) 32.dp else 21.dp, height = if (active) 40.dp else 28.dp)
+                            .clip(RoundedCornerShape(if (active) 6.dp else 3.dp))
+                            .background(if (active) bg else bg.copy(alpha = 0.35f))
+                            .then(
+                                if (active) Modifier.border(2.dp, Color.White, RoundedCornerShape(6.dp))
+                                else Modifier
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = letter,
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = if (active) 18.sp else 11.sp
+                            ),
+                            color = if (active) Color.White else Color.White.copy(alpha = 0.7f)
+                        )
+                    }
                 }
             }
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .background(colors.cardElevated),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("?", color = colors.mutedText, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            }
             Text(
-                text = emptyLabel,
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.mutedText
+                text = "Nutri-Score $upper",
+                style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace, fontSize = 10.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        } else {
+            Text(text = emptyLabel, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp), color = colors.mutedText)
+            Spacer(Modifier.height(4.dp))
         }
     }
 }

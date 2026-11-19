@@ -600,9 +600,9 @@ fun ProductThumbnail(
     Box(
         modifier = modifier
             .size(size)
-            .clip(RoundedCornerShape(BunkerRadius.Control))
+            .clip(ScoreSquareShape)
             .background(if (bitmap != null) Color.White else catBg)
-            .border(1.dp, colors.borderSubtle, RoundedCornerShape(BunkerRadius.Control)),
+            .border(1.dp, colors.borderSubtle, ScoreSquareShape),
         contentAlignment = Alignment.Center
     ) {
         Crossfade(
@@ -670,15 +670,16 @@ fun ScoreColumn(
     }
 
     Column(
-        modifier = modifier.width(44.dp),
+        modifier = modifier.width(46.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        // YsiFoods-style circular Nutri-Score badge
+        // Nutri-Score rounded-square badge (shared shape with the product thumbnail)
         Box(
             modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
+                .fillMaxWidth()
+                .height(28.dp)
+                .clip(ScoreSquareShape)
                 .background(gradeBg),
             contentAlignment = Alignment.Center
         ) {
@@ -692,36 +693,57 @@ fun ScoreColumn(
             )
         }
 
-        // Yuka-style 0-100 health score badge stacked right underneath
+        // Yuka score: same rounded square, carrot icon inside + 0-100 value
         if (yuka != null) {
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(BunkerRadius.Badge))
+                    .clip(ScoreSquareShape)
                     .background(yukaColor.copy(alpha = 0.16f))
-                    .border(1.dp, yukaColor.copy(alpha = 0.55f), RoundedCornerShape(BunkerRadius.Badge))
-                    .padding(horizontal = 4.dp, vertical = 3.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+                    .border(1.dp, yukaColor.copy(alpha = 0.6f), ScoreSquareShape)
+                    .padding(vertical = 3.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(yukaColor)
-                )
-                Spacer(Modifier.width(3.dp))
+                CarrotGlyph(modifier = Modifier.size(14.dp))
                 Text(
                     text = yuka.toString(),
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.ExtraBold,
-                        fontSize = 10.5.sp
+                        fontSize = 11.sp
                     ),
                     color = yukaColor
                 )
             }
         }
+    }
+}
+
+/** Shared rounded-square shape used by the Nutri-Score badge, Yuka badge and product thumbnail. */
+val ScoreSquareShape = RoundedCornerShape(8.dp)
+
+/** Small vector carrot used as the Yuka health-score glyph. */
+@Composable
+fun CarrotGlyph(modifier: Modifier = Modifier) {
+    androidx.compose.foundation.Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val leaf = Color(0xFF4ADE80)
+        val stem = androidx.compose.ui.geometry.Offset(w * 0.68f, h * 0.30f)
+        listOf(
+            androidx.compose.ui.geometry.Offset(w * 0.84f, h * 0.06f),
+            androidx.compose.ui.geometry.Offset(w * 0.98f, h * 0.22f),
+            androidx.compose.ui.geometry.Offset(w * 0.64f, h * 0.02f)
+        ).forEach { tip ->
+            drawLine(leaf, stem, tip, strokeWidth = 1.6.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+        }
+        val body = androidx.compose.ui.graphics.Path().apply {
+            moveTo(w * 0.04f, h * 0.96f)
+            lineTo(w * 0.52f, h * 0.22f)
+            quadraticTo(w * 0.86f, h * 0.30f, w * 0.80f, h * 0.52f)
+            close()
+        }
+        drawPath(body, Color(0xFFF97316))
     }
 }
 
