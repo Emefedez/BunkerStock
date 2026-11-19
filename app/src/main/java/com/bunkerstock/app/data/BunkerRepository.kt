@@ -33,6 +33,8 @@ class BunkerRepository(private val context: Context) {
         val EXPIRED_THRESHOLD_DAYS = intPreferencesKey("expired_threshold_days")
         val CRITICAL_THRESHOLD_DAYS = intPreferencesKey("critical_threshold_days")
         val WARNING_THRESHOLD_DAYS = intPreferencesKey("warning_threshold_days")
+        val FAMILY_AUTO_SYNC = booleanPreferencesKey("family_auto_sync_enabled")
+        val FAMILY_SYNC_INTERVAL_SEC = intPreferencesKey("family_sync_interval_sec")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed_v1")
     }
 
@@ -70,6 +72,8 @@ class BunkerRepository(private val context: Context) {
             expiredThresholdDays = (prefs[Keys.EXPIRED_THRESHOLD_DAYS] ?: 0).coerceIn(0, 30),
             criticalThresholdDays = (prefs[Keys.CRITICAL_THRESHOLD_DAYS] ?: 30).coerceIn(1, 365),
             warningThresholdDays = (prefs[Keys.WARNING_THRESHOLD_DAYS] ?: 90).coerceIn(2, 730),
+            familyAutoSyncEnabled = prefs[Keys.FAMILY_AUTO_SYNC] ?: true,
+            familySyncIntervalSec = (prefs[Keys.FAMILY_SYNC_INTERVAL_SEC] ?: 15).coerceIn(5, 300),
             onboardingCompleted = prefs[Keys.ONBOARDING_COMPLETED] ?: false
         )
     }
@@ -159,6 +163,13 @@ class BunkerRepository(private val context: Context) {
     suspend fun markOnboardingCompleted() {
         context.bunkerDataStore.edit { prefs ->
             prefs[Keys.ONBOARDING_COMPLETED] = true
+        }
+    }
+
+    suspend fun updateFamilySyncPrefs(enabled: Boolean, intervalSec: Int) {
+        context.bunkerDataStore.edit { prefs ->
+            prefs[Keys.FAMILY_AUTO_SYNC] = enabled
+            prefs[Keys.FAMILY_SYNC_INTERVAL_SEC] = intervalSec.coerceIn(5, 300)
         }
     }
 }

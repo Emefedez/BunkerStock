@@ -1,5 +1,7 @@
 package com.bunkerstock.app.ui.components
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -42,6 +44,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -73,7 +76,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import com.bunkerstock.app.data.DashboardMetrics
 import com.bunkerstock.app.data.ExpiryInfo
@@ -573,8 +580,13 @@ fun ProductThumbnail(
     val colors = LocalBunkerColors.current
     val (catIcon, catFg, catBg) = categoryStyle(category)
     var bitmap by remember(imageSource, barcode, productName) { mutableStateOf<Bitmap?>(null) }
+    var isLoading by remember(imageSource, barcode, productName) {
+        mutableStateOf(!imageSource.isNullOrBlank() || barcode.isNotBlank() || productName.isNotBlank())
+    }
 
     LaunchedEffect(imageSource, barcode, productName) {
+        val shouldLoad = !imageSource.isNullOrBlank() || barcode.isNotBlank() || productName.isNotBlank()
+        isLoading = shouldLoad
         bitmap = when {
             !imageSource.isNullOrBlank() -> ProductImageStore.loadBitmap(context, imageSource)
                 ?: ProductImageStore.resolveForProduct(context, barcode, productName)
@@ -582,6 +594,7 @@ fun ProductThumbnail(
                 ProductImageStore.resolveForProduct(context, barcode, productName)
             else -> null
         }
+        isLoading = false
     }
 
     Box(
@@ -592,21 +605,38 @@ fun ProductThumbnail(
             .border(1.dp, colors.borderSubtle, RoundedCornerShape(BunkerRadius.Control)),
         contentAlignment = Alignment.Center
     ) {
-        val bmp = bitmap
-        if (bmp != null) {
-            Image(
-                bitmap = bmp.asImageBitmap(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(size)
-            )
-        } else {
-            Icon(
-                imageVector = catIcon,
-                contentDescription = null,
-                tint = catFg,
-                modifier = Modifier.size(size * 0.45f)
-            )
+        Crossfade(
+            targetState = bitmap,
+            animationSpec = tween(260),
+            label = "thumbFade"
+        ) { bmp ->
+            if (bmp != null) {
+                Image(
+                    bitmap = bmp.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(size)
+                )
+            } else {
+                Box(
+                    modifier = Modifier.size(size),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = catIcon,
+                        contentDescription = null,
+                        tint = catFg.copy(alpha = if (isLoading) 0.45f else 1f),
+                        modifier = Modifier.size(size * 0.45f)
+                    )
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(size * 0.56f),
+                            strokeWidth = 2.dp,
+                            color = catFg.copy(alpha = 0.85f)
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -644,12 +674,11 @@ fun ScoreColumn(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        // Nutri-Score square badge (YsiFoods style)
+        // YsiFoods-style circular Nutri-Score badge
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(26.dp)
-                .clip(RoundedCornerShape(BunkerRadius.Control))
+                .size(32.dp)
+                .clip(CircleShape)
                 .background(gradeBg),
             contentAlignment = Alignment.Center
         ) {
@@ -657,7 +686,7 @@ fun ScoreColumn(
                 text = grade ?: "?",
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.ExtraBold,
-                    fontSize = 14.sp
+                    fontSize = 15.sp
                 ),
                 color = if (grade != null) Color.White else colors.mutedText
             )
@@ -702,7 +731,7 @@ fun InventoryItemCard(
     expiredDays: Int = 0,
     criticalDays: Int = 30,
     warningDays: Int = 90,
-    onCardClick: () -> Unit = {},
+    onCardClick: (Float, Float) -> Unit = { _, _ -> },
     onDecrement: () -> Unit,
     onIncrement: () -> Unit,
     onQrClick: () -> Unit,
@@ -712,6 +741,12 @@ fun InventoryItemCard(
 ) {
     val strings = LocalAppStrings.current
     val colors = LocalBunkerColors.current
+    val density = LocalDensity.current
+    val config = LocalConfiguration.current
+    val screenW = with(density) { config.screenWidthDp.dp.toPx() }.coerceAtLeast(1f)
+    val screenH = with(density) { config.screenHeightDp.dp.toPx() }.coerceAtLeast(1f)
+    var iconOriginX by remember { mutableStateOf(0.18f) }
+    var iconOriginY by remember { mutableStateOf(0.5f) }
     val info = InventoryLogic.getExpiryInfo(
         item = item,
         notApplicableLabel = strings.notApplicable,
@@ -743,7 +778,7 @@ fun InventoryItemCard(
             .clip(RoundedCornerShape(BunkerRadius.Control))
             .background(rowBg)
             .border(1.dp, colors.borderSubtle.copy(alpha = 0.55f), RoundedCornerShape(BunkerRadius.Control))
-            .clickable(onClick = onCardClick)
+            .clickable { onCardClick(iconOriginX, iconOriginY) }
     ) {
         Row(modifier = Modifier.fillMaxWidth()) {
             if (accentBar != Color.Transparent) {
@@ -771,7 +806,12 @@ fun InventoryItemCard(
                         category = category,
                         barcode = item.barcode,
                         productName = item.name,
-                        size = 48.dp
+                        size = 48.dp,
+                        modifier = Modifier.onGloballyPositioned { coords ->
+                            val center = coords.boundsInRoot().center
+                            iconOriginX = (center.x / screenW).coerceIn(0.05f, 0.95f)
+                            iconOriginY = (center.y / screenH).coerceIn(0.08f, 0.92f)
+                        }
                     )
                     Column(
                         modifier = Modifier.weight(1f),
@@ -874,22 +914,17 @@ fun InventoryItemCard(
                         }
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.padding(horizontal = 6.dp)
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.padding(horizontal = 10.dp)
                         ) {
                             Text(
                                 text = InventoryLogic.formatQty(item.qty),
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontFamily = FontFamily.Monospace,
-                                    fontSize = 14.sp
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
                                 ),
                                 color = if (item.qty <= 0.0) colors.danger else MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = strings.unitLabel(unit),
-                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 11.sp),
-                                color = colors.mutedText,
-                                maxLines = 1
                             )
                         }
                         IconButton(

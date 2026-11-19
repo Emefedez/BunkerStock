@@ -71,6 +71,7 @@ import com.bunkerstock.app.ui.components.CriticalAlertBanner
 import com.bunkerstock.app.ui.components.InventoryItemCard
 import com.bunkerstock.app.ui.components.KpiCard
 import com.bunkerstock.app.ui.components.WarehouseHealthBar
+import com.bunkerstock.app.ui.components.categoryStyle
 import com.bunkerstock.app.ui.components.kpiIconFor
 import com.bunkerstock.app.ui.theme.BunkerRadius
 import com.bunkerstock.app.ui.theme.LocalAppStrings
@@ -90,7 +91,7 @@ fun WarehouseScreen(
     onResetFilters: () -> Unit,
     onDismissBanner: () -> Unit,
     onAdjustQty: (String, Double) -> Unit,
-    onOpenDetail: (String) -> Unit,
+    onOpenDetail: (String, Float, Float) -> Unit,
     onOpenQr: (String) -> Unit,
     onEditItem: (InventoryItem) -> Unit,
     onDeleteItem: (InventoryItem) -> Unit,
@@ -356,6 +357,7 @@ fun WarehouseScreen(
                                 val checked = state.selectedCategories.any {
                                     it.equals(cat.storageKey, ignoreCase = true)
                                 }
+                                val (catIcon, catFg, _) = categoryStyle(cat)
                                 DropdownMenuItem(
                                     text = {
                                         Row(
@@ -366,6 +368,12 @@ fun WarehouseScreen(
                                                 checked = checked,
                                                 onCheckedChange = null,
                                                 colors = CheckboxDefaults.colors(checkedColor = colors.emerald)
+                                            )
+                                            Icon(
+                                                imageVector = catIcon,
+                                                contentDescription = null,
+                                                tint = catFg,
+                                                modifier = Modifier.size(17.dp)
                                             )
                                             Text(
                                                 text = strings.categoryLabel(cat),
@@ -596,7 +604,7 @@ fun WarehouseScreen(
                     expiredDays = expiredDays,
                     criticalDays = criticalDays,
                     warningDays = warningDays,
-                    onCardClick = { onOpenDetail(item.id) },
+                    onCardClick = { ox, oy -> onOpenDetail(item.id, ox, oy) },
                     onDecrement = { onAdjustQty(item.id, -1.0) },
                     onIncrement = { onAdjustQty(item.id, 1.0) },
                     onQrClick = { onOpenQr(item.id) },

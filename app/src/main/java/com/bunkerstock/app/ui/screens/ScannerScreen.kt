@@ -33,14 +33,21 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.ImageSearch
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.VideocamOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -70,7 +77,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -78,6 +87,7 @@ import com.bunkerstock.app.data.DetectedScanCandidate
 import com.bunkerstock.app.data.InventoryItem
 import com.bunkerstock.app.data.ItemCategory
 import com.bunkerstock.app.data.ItemUnit
+import com.bunkerstock.app.data.ShoppingScanEntry
 import com.bunkerstock.app.domain.InventoryLogic
 import com.bunkerstock.app.scanner.BarcodeAnalyzer
 import com.bunkerstock.app.ui.components.NutritionBadgesRow
@@ -92,8 +102,16 @@ import java.util.concurrent.Executors
 fun ScannerScreen(
     detectedCandidate: DetectedScanCandidate?,
     detectedExistingItem: InventoryItem?,
+    shoppingModeActive: Boolean,
+    shoppingEntries: List<ShoppingScanEntry>,
+    showShoppingToggle: Boolean,
     unlockTrigger: Int,
     onCodeScanned: (String) -> Unit,
+    onToggleShoppingMode: () -> Unit,
+    onAdjustShoppingEntry: (String, Double) -> Unit,
+    onUndoShoppingEntry: (String) -> Unit,
+    onOpenShoppingItemDetail: (String) -> Unit,
+    onFinishShoppingSession: () -> Unit,
     onDismissCandidate: () -> Unit,
     onConfirmCandidate: () -> Unit,
     onQuickAddExisting: (String, Double) -> Unit,
@@ -309,15 +327,54 @@ fun ScannerScreen(
                         Surface(
                             shape = RoundedCornerShape(BunkerRadius.Badge),
                             color = Color(0xCC111312),
-                            border = BorderStroke(1.dp, colors.amber.copy(alpha = 0.4f))
+                            border = BorderStroke(
+                                1.dp,
+                                if (shoppingModeActive) colors.emerald.copy(alpha = 0.65f) else colors.amber.copy(alpha = 0.4f)
+                            )
                         ) {
                             Text(
-                                text = strings.scannerGuideHint,
+                                text = if (shoppingModeActive) strings.shoppingModeActiveHint else strings.scannerGuideHint,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = colors.amber,
+                                color = if (shoppingModeActive) colors.emerald else colors.amber,
+                                textAlign = TextAlign.Center,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                             )
                         }
+                    }
+                }
+            }
+
+            // Top-left Shopping / Rapid Intake Mode pill toggle (never shifts top-right camera icons!)
+            if (showShoppingToggle) {
+                Surface(
+                    shape = RoundedCornerShape(BunkerRadius.Control),
+                    color = if (shoppingModeActive) colors.emerald else Color(0xBB111312),
+                    border = BorderStroke(
+                        1.dp,
+                        if (shoppingModeActive) colors.emerald else Color.White.copy(alpha = 0.22f)
+                    ),
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(10.dp)
+                        .height(42.dp)
+                        .clickable(onClick = onToggleShoppingMode)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ShoppingCart,
+                            contentDescription = strings.shoppingModeLabel,
+                            tint = if (shoppingModeActive) Color(0xFF111312) else colors.emerald,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = strings.shoppingModeLabel,
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = if (shoppingModeActive) Color(0xFF111312) else Color.White
+                        )
                     }
                 }
             }
@@ -363,9 +420,124 @@ fun ScannerScreen(
                 }
             }
 
+            // Live Shopping Haul Tray over bottom of viewfinder (rapid back-to-back intake!)
+            androidx.compose.animation.AnimatedVisibility(
+                visible = shoppingModeActive && shoppingEntries.isNotEmpty(),
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(10.dp)
+            ) {
+                val totalAdded = shoppingEntries.sumOf { it.addedQty }.toInt()
+                Surface(
+                    shape = RoundedCornerShape(BunkerRadius.Sheet),
+                    color = colors.cardSurface.copy(alpha = 0.96f),
+                    border = BorderStroke(1.5.dp, colors.emerald.copy(alpha = 0.7f)),
+                    shadowElevation = 12.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 168.dp),
+                            verticalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            items(shoppingEntries, key = { it.itemId }) { entry ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(BunkerRadius.Control))
+                                        .background(colors.canvas)
+                                        .border(1.dp, colors.borderSubtle, RoundedCornerShape(BunkerRadius.Control))
+                                        .clickable { onOpenShoppingItemDetail(entry.itemId) }
+                                        .padding(horizontal = 8.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    if (entry.isEnriching) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(14.dp),
+                                            strokeWidth = 2.dp,
+                                            color = colors.emerald
+                                        )
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = entry.name,
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontSize = 12.5.sp
+                                            ),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = entry.barcode,
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 9.5.sp
+                                            ),
+                                            color = colors.mutedText,
+                                            maxLines = 1
+                                        )
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        IconButton(
+                                            onClick = { onAdjustShoppingEntry(entry.itemId, -1.0) },
+                                            modifier = Modifier.size(30.dp)
+                                        ) {
+                                            Icon(Icons.Default.Remove, contentDescription = null, modifier = Modifier.size(15.dp))
+                                        }
+                                        Text(
+                                            text = "+${InventoryLogic.formatQty(entry.addedQty)}",
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                fontFamily = FontFamily.Monospace,
+                                                fontWeight = FontWeight.ExtraBold
+                                            ),
+                                            color = colors.emerald,
+                                            modifier = Modifier.padding(horizontal = 3.dp)
+                                        )
+                                        IconButton(
+                                            onClick = { onAdjustShoppingEntry(entry.itemId, 1.0) },
+                                            modifier = Modifier.size(30.dp)
+                                        ) {
+                                            Icon(Icons.Default.Add, contentDescription = null, tint = colors.emerald, modifier = Modifier.size(15.dp))
+                                        }
+                                        IconButton(
+                                            onClick = { onUndoShoppingEntry(entry.itemId) },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(Icons.Default.Close, contentDescription = null, tint = colors.danger, modifier = Modifier.size(14.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Button(
+                            onClick = onFinishShoppingSession,
+                            shape = RoundedCornerShape(BunkerRadius.Control),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(42.dp)
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(17.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(strings.shoppingDoneBtn(totalAdded), fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
             // Non-blocking Bottom Detection Popup over viewfinder (camera stays live!)
             androidx.compose.animation.AnimatedVisibility(
-                visible = detectedCandidate != null,
+                visible = !shoppingModeActive && detectedCandidate != null,
                 enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
                 exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
                 modifier = Modifier

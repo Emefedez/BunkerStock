@@ -82,7 +82,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.DisposableEffect
 import com.bunkerstock.app.data.AppLanguage
 import com.bunkerstock.app.data.AppThemeMode
 import com.bunkerstock.app.data.ExpiryNotificationHelper
@@ -209,6 +213,19 @@ private fun BunkerStockApp(
     var isGeneratingBatchPdf by remember { mutableStateOf(false) }
     val appScope = rememberCoroutineScope()
 
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val obs = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> viewModel.setAppForeground(true)
+                Lifecycle.Event.ON_PAUSE -> viewModel.setAppForeground(false)
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
+
     LaunchedEffect(Unit) {
         viewModel.toastEvents.collect { msg ->
             snackbarHostState.showSnackbar(msg)
@@ -328,6 +345,7 @@ private fun BunkerStockApp(
         Triple(BunkerTab.SETTINGS, strings.navSettings, Icons.Default.Settings)
     )
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = colors.canvas,
@@ -395,7 +413,7 @@ private fun BunkerStockApp(
                                     border = BorderStroke(1.dp, colors.borderSubtle)
                                 ) {
                                     Text(
-                                        text = "V3.1",
+                                        text = "V3.2",
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontFamily = FontFamily.Monospace,
                                             fontSize = 9.sp
@@ -624,8 +642,16 @@ private fun BunkerStockApp(
                         ScannerScreen(
                             detectedCandidate = state.detectedCandidate,
                             detectedExistingItem = state.detectedExistingItem,
+                            shoppingModeActive = state.shoppingModeActive,
+                            shoppingEntries = state.shoppingEntries,
+                            showShoppingToggle = !state.scannerForForm,
                             unlockTrigger = scannerUnlockCounter,
                             onCodeScanned = { code -> viewModel.onCodeScanned(code) },
+                            onToggleShoppingMode = viewModel::toggleShoppingMode,
+                            onAdjustShoppingEntry = viewModel::adjustShoppingEntry,
+                            onUndoShoppingEntry = viewModel::undoShoppingEntry,
+                            onOpenShoppingItemDetail = { id -> viewModel.openItemDetail(id, 0.5f, 0.8f) },
+                            onFinishShoppingSession = viewModel::finishShoppingSession,
                             onDismissCandidate = viewModel::dismissDetectedCandidate,
                             onConfirmCandidate = viewModel::confirmDetectedCandidate,
                             onQuickAddExisting = { id, amt -> viewModel.adjustQuantity(id, amt, notifyQuickAdd = true) },
@@ -662,6 +688,8 @@ private fun BunkerStockApp(
                             isSyncingFamily = state.isSyncingFamily,
                             onOpenFamilyDialog = viewModel::openFamilyDialog,
                             onSyncFamilyNow = { viewModel.syncFamilyNow(silent = false) },
+                            onFamilySyncPrefsChange = viewModel::setFamilySyncPrefs,
+                            onUpdateMemberName = viewModel::updateFamilyMemberName,
                             onLanguageChange = viewModel::setLanguage,
                             onThemeModeChange = viewModel::setThemeMode,
                             onWaterConfigChange = viewModel::setWaterConfig,
@@ -682,9 +710,11 @@ private fun BunkerStockApp(
         }
     }
 
-    // Animated Product Detail Overlay (hero photo, Nutri-Score + BioShock Yuka gauge, batches & interactive calendar)
+    // Full-Screen Animated Product Detail Page (zooms smoothly from product icon upward — zero window X!)
     ProductDetailOverlay(
         item = state.detailItem,
+        originX = state.detailOriginX,
+        originY = state.detailOriginY,
         expiredDays = state.settings.expiredThresholdDays,
         criticalDays = state.settings.criticalThresholdDays,
         warningDays = state.settings.warningThresholdDays,
@@ -696,6 +726,7 @@ private fun BunkerStockApp(
         onMessage = viewModel::notifyMessage,
         onDismiss = viewModel::closeItemDetail
     )
+    } // end root Box
 
     // Add / Edit Bottom Sheet (hidden while inline form scanner is active)
     if (state.showItemSheet && !state.scannerForForm) {

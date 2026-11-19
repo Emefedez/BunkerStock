@@ -60,7 +60,20 @@ object InventoryLogic {
             expiryDate = relativeDateString(14, today),
             location = "Estantería 1 - Balda B",
             notes = "Rotar urgentemente al consumo diario",
-            nutrition = ProductNutrition(nutriScoreGrade = "B", novaGroup = 2, healthScore = 76),
+            nutrition = ProductNutrition(
+                nutriScoreGrade = "B",
+                novaGroup = 2,
+                healthScore = 76,
+                energyKcal = 192.0,
+                proteinGrams = 24.5,
+                carbsGrams = 0.0,
+                sugarsGrams = 0.0,
+                fatGrams = 10.5,
+                satFatGrams = 1.8,
+                fiberGrams = 0.0,
+                saltGrams = 1.1,
+                safetyFlags = listOf("HIGH_PROTEIN")
+            ),
             batches = listOf(
                 ExpiryBatch(id = "b-2a", qty = 3.0, expiryDate = relativeDateString(14, today), note = "Lote antiguo"),
                 ExpiryBatch(id = "b-2b", qty = 5.0, expiryDate = relativeDateString(95, today), note = "Compra reciente")
@@ -77,7 +90,20 @@ object InventoryLogic {
             expiryDate = relativeDateString(-5, today),
             location = "Mochila 72h",
             notes = "Revisar y reemplazar lote caducado",
-            nutrition = ProductNutrition(nutriScoreGrade = "C", novaGroup = 3, healthScore = 54)
+            nutrition = ProductNutrition(
+                nutriScoreGrade = "C",
+                novaGroup = 3,
+                healthScore = 54,
+                energyKcal = 418.0,
+                proteinGrams = 7.2,
+                carbsGrams = 62.0,
+                sugarsGrams = 24.0,
+                fatGrams = 14.8,
+                satFatGrams = 3.2,
+                fiberGrams = 5.4,
+                saltGrams = 0.35,
+                safetyFlags = listOf("HIGH_SUGAR", "HIGH_FIBER")
+            )
         ),
         InventoryItem(
             id = "item-4",
@@ -90,7 +116,19 @@ object InventoryLogic {
             expiryDate = relativeDateString(320, today),
             location = "Estantería 1 - Balda A",
             notes = "Bolsas de 1kg selladas",
-            nutrition = ProductNutrition(nutriScoreGrade = "A", novaGroup = 1, healthScore = 90)
+            nutrition = ProductNutrition(
+                nutriScoreGrade = "A",
+                novaGroup = 1,
+                healthScore = 90,
+                energyKcal = 356.0,
+                proteinGrams = 7.1,
+                carbsGrams = 79.0,
+                sugarsGrams = 0.2,
+                fatGrams = 0.7,
+                satFatGrams = 0.2,
+                fiberGrams = 1.4,
+                saltGrams = 0.01
+            )
         ),
         InventoryItem(
             id = "item-5",
@@ -151,7 +189,20 @@ object InventoryLogic {
             expiryDate = relativeDateString(72, today),
             location = "Estantería 2 - Balda C",
             notes = "Listas para consumir sin cocción",
-            nutrition = ProductNutrition(nutriScoreGrade = "A", novaGroup = 1, healthScore = 88)
+            nutrition = ProductNutrition(
+                nutriScoreGrade = "A",
+                novaGroup = 1,
+                healthScore = 88,
+                energyKcal = 84.0,
+                proteinGrams = 6.2,
+                carbsGrams = 11.4,
+                sugarsGrams = 0.5,
+                fatGrams = 0.4,
+                satFatGrams = 0.1,
+                fiberGrams = 4.9,
+                saltGrams = 0.65,
+                safetyFlags = listOf("HIGH_FIBER")
+            )
         )
     )
 

@@ -22,21 +22,26 @@ import com.bunkerstock.app.data.FamilySyncClient
 import com.bunkerstock.app.data.InventoryItem
 import com.bunkerstock.app.data.ItemPrefill
 import com.bunkerstock.app.data.OpenFoodFactsClient
+import com.bunkerstock.app.data.ShoppingScanEntry
 import com.bunkerstock.app.data.SortOption
 import com.bunkerstock.app.data.StatusFilter
 import com.bunkerstock.app.data.UpdateChecker
 import com.bunkerstock.app.domain.InventoryLogic
 import com.bunkerstock.app.ui.theme.stringsFor
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -72,7 +77,11 @@ data class BunkerUiState(
     val quickScanItemId: String? = null,
     val qrLabelItemId: String? = null,
     val detailItemId: String? = null,
+    val detailOriginX: Float = 0.5f,
+    val detailOriginY: Float = 0.5f,
     val showBatchQrDialog: Boolean = false,
+    val shoppingModeActive: Boolean = false,
+    val shoppingEntries: List<ShoppingScanEntry> = emptyList(),
     val pendingConfirm: PendingConfirm? = null,
     val availableUpdate: AppUpdateInfo? = null,
     val isDownloadingUpdate: Boolean = false,
@@ -118,7 +127,11 @@ private data class ModalState(
     val quickScanItemId: String? = null,
     val qrLabelItemId: String? = null,
     val detailItemId: String? = null,
+    val detailOriginX: Float = 0.5f,
+    val detailOriginY: Float = 0.5f,
     val showBatchQrDialog: Boolean = false,
+    val shoppingModeActive: Boolean = false,
+    val shoppingEntries: List<ShoppingScanEntry> = emptyList(),
     val pendingConfirm: PendingConfirm? = null,
     val availableUpdate: AppUpdateInfo? = null,
     val isDownloadingUpdate: Boolean = false,
@@ -131,6 +144,11 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
     private val repository = BunkerRepository(application.applicationContext)
     private val filtersFlow = MutableStateFlow(LocalUiFilters())
     private val modalFlow = MutableStateFlow(ModalState())
+    private val appForegroundFlow = MutableStateFlow(true)
+    private val syncInFlight = AtomicBoolean(false)
+    @Volatile private var lastRemoteCipherHash: String = ""
+    @Volatile private var lastLocalStateHash: String = ""
+    private val shoppingCooldownByCode = mutableMapOf<String, Long>()
 
     private val _toastEvents = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val toastEvents = _toastEvents.asSharedFlow()
@@ -180,7 +198,11 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
             quickScanItemId = modals.quickScanItemId,
             qrLabelItemId = modals.qrLabelItemId,
             detailItemId = modals.detailItemId,
+            detailOriginX = modals.detailOriginX,
+            detailOriginY = modals.detailOriginY,
             showBatchQrDialog = modals.showBatchQrDialog,
+            shoppingModeActive = modals.shoppingModeActive,
+            shoppingEntries = modals.shoppingEntries,
             pendingConfirm = modals.pendingConfirm,
             availableUpdate = modals.availableUpdate,
             isDownloadingUpdate = modals.isDownloadingUpdate,
@@ -208,6 +230,39 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
                 checkForUpdates(silent = true)
             }
         }
+
+        // Foreground diff-polling loop: checks for remote family diffs every N seconds while open
+        viewModelScope.launch {
+            combine(
+                appForegroundFlow,
+                repository.familyGroupFlow,
+                repository.settingsFlow
+            ) { fg, family, settings ->
+                Triple(fg && family.isJoined && settings.familyAutoSyncEnabled, settings.familySyncIntervalSec, family.roomId)
+            }
+                .distinctUntilChanged()
+                .collectLatest { (shouldPoll, intervalSec, _) ->
+                    if (!shouldPoll) return@collectLatest
+                    val delayMs = intervalSec.coerceIn(5, 300) * 1000L
+                    while (true) {
+                        delay(delayMs)
+                        syncFamilyNow(silent = true, isBackgroundPoll = true)
+                    }
+                }
+        }
+    }
+
+    fun setAppForeground(inForeground: Boolean) {
+        val wasForeground = appForegroundFlow.value
+        appForegroundFlow.value = inForeground
+        if (inForeground && !wasForeground) {
+            viewModelScope.launch {
+                val family = repository.familyGroupFlow.first()
+                if (family.isJoined) {
+                    syncFamilyNow(silent = true, isBackgroundPoll = true)
+                }
+            }
+        }
     }
 
     private fun strings() = stringsFor(uiState.value.settings.language)
@@ -230,8 +285,17 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun selectCategory(category: String?) {
-        filtersFlow.update {
-            it.copy(selectedCategories = if (category == null) emptySet() else setOf(category))
+        filtersFlow.update { current ->
+            val next = if (category == null) {
+                emptySet()
+            } else if (current.selectedCategories.size == 1 &&
+                current.selectedCategories.first().equals(category, ignoreCase = true)
+            ) {
+                emptySet()
+            } else {
+                setOf(category)
+            }
+            current.copy(selectedCategories = next)
         }
     }
 
@@ -245,8 +309,15 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun selectStatus(status: StatusFilter) {
-        filtersFlow.update {
-            it.copy(selectedStatuses = if (status == StatusFilter.ALL) emptySet() else setOf(status))
+        filtersFlow.update { current ->
+            val next = if (status == StatusFilter.ALL) {
+                emptySet()
+            } else if (current.selectedStatuses.size == 1 && current.selectedStatuses.contains(status)) {
+                emptySet()
+            } else {
+                setOf(status)
+            }
+            current.copy(selectedStatuses = next)
         }
     }
 
@@ -337,11 +408,16 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
     fun saveItem(item: InventoryItem, isEdit: Boolean) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            val stamped = item.copy(
-                updatedAt = now,
-                updatedBy = uiState.value.familyGroup.memberName
-            )
+            val member = uiState.value.familyGroup.memberName.trim()
             val current = uiState.value.inventory.toMutableList()
+            val existingAuthor = if (isEdit) {
+                current.firstOrNull { it.id == item.id }?.addedBy.orEmpty()
+            } else ""
+            val stamped = item.copy(
+                addedBy = item.addedBy.ifBlank { existingAuthor.ifBlank { member } },
+                updatedAt = now,
+                updatedBy = member
+            )
             if (isEdit) {
                 val idx = current.indexOfFirst { it.id == stamped.id }
                 if (idx >= 0) {
@@ -462,6 +538,12 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
 
         val state = uiState.value
         val (gs1Expiry, gs1Batch) = InventoryLogic.extractGs1ExpiryAndBatch(code)
+
+        // Rapid Shopping / Haul Intake Mode: auto-adds or increments back-to-back without blocking camera!
+        if (!state.scannerForForm && state.shoppingModeActive) {
+            handleShoppingModeScan(code, gs1Expiry, gs1Batch)
+            return
+        }
 
         if (state.scannerForForm) {
             val structured = InventoryLogic.parseStructuredQr(code)
@@ -640,6 +722,191 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
         openEditItem(item)
     }
 
+    // Shopping / Rapid Back-to-Back Intake Mode
+    fun toggleShoppingMode() {
+        modalFlow.update {
+            it.copy(
+                shoppingModeActive = !it.shoppingModeActive,
+                detectedCandidate = null
+            )
+        }
+    }
+
+    private fun handleShoppingModeScan(code: String, gs1Expiry: String?, gs1Batch: String?) {
+        val now = System.currentTimeMillis()
+        val lastAt = shoppingCooldownByCode[code] ?: 0L
+        if (now - lastAt < 2200L) return
+        shoppingCooldownByCode[code] = now
+
+        val state = uiState.value
+        val member = state.familyGroup.memberName.trim()
+        val existing = state.inventory.firstOrNull {
+            it.barcode.isNotBlank() && it.barcode.equals(code, ignoreCase = true)
+        }
+
+        if (existing != null) {
+            adjustQuantity(existing.id, 1.0, notifyQuickAdd = false)
+            modalFlow.update { m ->
+                val list = m.shoppingEntries.toMutableList()
+                val idx = list.indexOfFirst { it.itemId == existing.id }
+                if (idx >= 0) {
+                    val prev = list.removeAt(idx)
+                    list.add(0, prev.copy(addedQty = prev.addedQty + 1.0))
+                } else {
+                    list.add(0, ShoppingScanEntry(existing.id, code, existing.name, 1.0, isNew = false))
+                }
+                m.copy(shoppingEntries = list)
+            }
+            return
+        }
+
+        // New product: create immediately and enrich in background via Open Food Facts
+        val structured = InventoryLogic.parseStructuredQr(code)
+        val newId = "item-$now"
+        val initialName = structured?.name?.ifBlank { code } ?: code
+        val initialExpiry = structured?.expiryDate ?: gs1Expiry ?: InventoryLogic.relativeDateString(180)
+        val initialNotes = buildString {
+            if (structured != null) append(structured.notes)
+            if (gs1Expiry != null) {
+                if (isNotEmpty()) append(" · ")
+                append(strings().expiryGs1Note)
+            }
+            if (!gs1Batch.isNullOrBlank()) {
+                if (isNotEmpty()) append(" · ")
+                append("Lote: $gs1Batch")
+            }
+        }
+        val created = InventoryItem(
+            id = newId,
+            barcode = code,
+            name = initialName,
+            category = structured?.category ?: com.bunkerstock.app.data.ItemCategory.FOOD.storageKey,
+            qty = 1.0,
+            noExpiry = structured?.noExpiry ?: false,
+            expiryDate = initialExpiry,
+            notes = initialNotes,
+            addedBy = member,
+            updatedAt = now,
+            updatedBy = member
+        )
+
+        viewModelScope.launch {
+            val current = repository.inventoryFlow.first().toMutableList()
+            current.add(0, created)
+            repository.saveInventory(current)
+            ExpiryNotificationHelper.evaluateAndNotify(getApplication(), repository)
+            if (uiState.value.familyGroup.isJoined) syncFamilyNow(silent = true)
+
+            val needLookup = structured == null && code.matches(Regex("^\\d{8,14}$"))
+            modalFlow.update { m ->
+                val entry = ShoppingScanEntry(
+                    itemId = newId,
+                    barcode = code,
+                    name = if (needLookup) strings().shoppingResolving else initialName,
+                    addedQty = 1.0,
+                    isNew = true,
+                    isEnriching = needLookup
+                )
+                m.copy(shoppingEntries = listOf(entry) + m.shoppingEntries)
+            }
+
+            if (needLookup) {
+                val off = OpenFoodFactsClient.lookup(code)
+                if (off != null) {
+                    val estDays = InventoryLogic.estimateShelfLifeDays(
+                        off.name,
+                        off.category,
+                        off.nutrition?.safetyFlags.orEmpty()
+                    )
+                    val resolvedExpiry = gs1Expiry ?: InventoryLogic.relativeDateString(estDays)
+                    val noteText = buildString {
+                        if (gs1Expiry != null) append(strings().expiryGs1Note)
+                        else append(strings().expiryEstimatedNote(estDays))
+                        if (!gs1Batch.isNullOrBlank()) append(" · Lote: $gs1Batch")
+                    }
+                    val latest = repository.inventoryFlow.first().toMutableList()
+                    val idx = latest.indexOfFirst { it.id == newId }
+                    if (idx >= 0) {
+                        latest[idx] = latest[idx].copy(
+                            name = off.name,
+                            category = off.category,
+                            expiryDate = resolvedExpiry,
+                            notes = noteText,
+                            imageUri = off.nutrition?.imageUrl,
+                            nutrition = off.nutrition,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                        repository.saveInventory(latest)
+                        if (uiState.value.familyGroup.isJoined) syncFamilyNow(silent = true)
+                    }
+                    modalFlow.update { m ->
+                        m.copy(
+                            shoppingEntries = m.shoppingEntries.map { e ->
+                                if (e.itemId == newId) e.copy(name = off.name, isEnriching = false) else e
+                            }
+                        )
+                    }
+                } else {
+                    modalFlow.update { m ->
+                        m.copy(
+                            shoppingEntries = m.shoppingEntries.map { e ->
+                                if (e.itemId == newId) e.copy(name = code, isEnriching = false) else e
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun adjustShoppingEntry(itemId: String, delta: Double) {
+        val entry = uiState.value.shoppingEntries.firstOrNull { it.itemId == itemId } ?: return
+        val nextAdded = entry.addedQty + delta
+        if (nextAdded <= 0.0) {
+            undoShoppingEntry(itemId)
+            return
+        }
+        adjustQuantity(itemId, delta, notifyQuickAdd = false)
+        modalFlow.update { m ->
+            m.copy(
+                shoppingEntries = m.shoppingEntries.map { e ->
+                    if (e.itemId == itemId) e.copy(addedQty = nextAdded) else e
+                }
+            )
+        }
+    }
+
+    fun undoShoppingEntry(itemId: String) {
+        val entry = uiState.value.shoppingEntries.firstOrNull { it.itemId == itemId } ?: return
+        modalFlow.update { m ->
+            m.copy(shoppingEntries = m.shoppingEntries.filterNot { it.itemId == itemId })
+        }
+        viewModelScope.launch {
+            val current = repository.inventoryFlow.first().toMutableList()
+            val idx = current.indexOfFirst { it.id == itemId }
+            if (idx >= 0) {
+                val item = current[idx]
+                if (entry.isNew && item.qty <= entry.addedQty) {
+                    current.removeAt(idx)
+                } else {
+                    current[idx] = item.copy(
+                        qty = max(0.0, item.qty - entry.addedQty),
+                        updatedAt = System.currentTimeMillis()
+                    )
+                }
+                repository.saveInventory(current)
+                if (uiState.value.familyGroup.isJoined) syncFamilyNow(silent = true)
+            }
+        }
+    }
+
+    fun finishShoppingSession() {
+        shoppingCooldownByCode.clear()
+        modalFlow.update { it.copy(shoppingModeActive = false, shoppingEntries = emptyList()) }
+        selectTab(BunkerTab.WAREHOUSE)
+        if (uiState.value.familyGroup.isJoined) syncFamilyNow(silent = true)
+    }
+
     // QR Label Modal
     fun openQrLabel(itemId: String) {
         viewModelScope.launch {
@@ -660,18 +927,41 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
         modalFlow.update { it.copy(qrLabelItemId = null) }
     }
 
-    fun openItemDetail(itemId: String) {
+    fun openItemDetail(itemId: String, originX: Float = 0.5f, originY: Float = 0.5f) {
+        modalFlow.update {
+            it.copy(
+                detailItemId = itemId,
+                detailOriginX = originX.coerceIn(0.05f, 0.95f),
+                detailOriginY = originY.coerceIn(0.08f, 0.92f)
+            )
+        }
         viewModelScope.launch {
             val current = uiState.value.inventory.toMutableList()
             val idx = current.indexOfFirst { it.id == itemId }
             if (idx < 0) return@launch
-            val item = current[idx]
+            var item = current[idx]
             if (item.barcode.isBlank()) {
                 val generated = "BNK-" + System.currentTimeMillis().toString().takeLast(6)
-                current[idx] = item.copy(barcode = generated)
+                item = item.copy(barcode = generated)
+                current[idx] = item
                 repository.saveInventory(current)
             }
-            modalFlow.update { it.copy(detailItemId = itemId) }
+            // Auto-enrich missing calories/macros from Open Food Facts if barcode is numeric EAN/UPC
+            if (item.nutrition?.energyKcal == null && item.barcode.matches(Regex("^\\d{8,14}$"))) {
+                val off = OpenFoodFactsClient.lookup(item.barcode)
+                if (off?.nutrition != null) {
+                    val latest = uiState.value.inventory.toMutableList()
+                    val latestIdx = latest.indexOfFirst { it.id == itemId }
+                    if (latestIdx >= 0) {
+                        val existing = latest[latestIdx]
+                        latest[latestIdx] = existing.copy(
+                            nutrition = off.nutrition,
+                            imageUri = existing.imageUri ?: off.nutrition.imageUrl
+                        )
+                        repository.saveInventory(latest)
+                    }
+                }
+            }
         }
     }
 
@@ -799,6 +1089,21 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun setFamilySyncPrefs(enabled: Boolean, intervalSec: Int) {
+        viewModelScope.launch {
+            repository.updateFamilySyncPrefs(enabled, intervalSec)
+        }
+    }
+
+    fun updateFamilyMemberName(memberName: String) {
+        viewModelScope.launch {
+            val current = repository.familyGroupFlow.first()
+            if (!current.isJoined) return@launch
+            repository.saveFamilyGroup(current.copy(memberName = memberName.trim()))
+            emitToast(strings().toastFamilyUserSaved)
+        }
+    }
+
     // Family Group Sync (E2E Encrypted, Zero-Auth)
     fun openFamilyDialog() {
         modalFlow.update { it.copy(showFamilyDialog = true) }
@@ -851,29 +1156,52 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun syncFamilyNow(silent: Boolean = false) {
+    fun syncFamilyNow(silent: Boolean = false, isBackgroundPoll: Boolean = false) {
         viewModelScope.launch {
             val cfg = repository.familyGroupFlow.first()
             if (!cfg.isJoined) return@launch
-            modalFlow.update { it.copy(isSyncingFamily = true) }
-            val localItems = repository.inventoryFlow.first()
-            val localDeleted = repository.deletedIdsFlow.first()
-            val result = FamilySyncClient.syncGroup(cfg, localItems, localDeleted)
-            modalFlow.update { it.copy(isSyncingFamily = false) }
-            result.onSuccess { (items, deleted, syncedCfg) ->
-                repository.saveInventory(items)
-                repository.saveDeletedIds(deleted)
-                repository.saveFamilyGroup(syncedCfg)
-                ExpiryNotificationHelper.evaluateAndNotify(getApplication(), repository)
-                if (!silent) emitToast(strings().toastFamilySynced)
-            }.onFailure {
-                if (!silent) emitToast(strings().toastFamilySyncError)
+            if (!syncInFlight.compareAndSet(false, true)) return@launch
+            try {
+                if (!isBackgroundPoll) {
+                    modalFlow.update { it.copy(isSyncingFamily = true) }
+                }
+                val localItems = repository.inventoryFlow.first()
+                val localDeleted = repository.deletedIdsFlow.first()
+                val result = FamilySyncClient.syncGroupDiff(
+                    config = cfg,
+                    localItems = localItems,
+                    localDeleted = localDeleted,
+                    lastRemoteHash = if (isBackgroundPoll) lastRemoteCipherHash else "",
+                    lastLocalHash = if (isBackgroundPoll) lastLocalStateHash else ""
+                )
+                result.onSuccess { outcome ->
+                    lastRemoteCipherHash = outcome.remoteCipherHash
+                    lastLocalStateHash = outcome.localStateHash
+                    if (outcome.localChanged) {
+                        repository.saveInventory(outcome.items)
+                        repository.saveDeletedIds(outcome.deletedIds)
+                        ExpiryNotificationHelper.evaluateAndNotify(getApplication(), repository)
+                    }
+                    if (outcome.localChanged || outcome.remoteUploaded || outcome.config.lastSyncedAt != cfg.lastSyncedAt) {
+                        repository.saveFamilyGroup(outcome.config)
+                    }
+                    if (!silent) emitToast(strings().toastFamilySynced)
+                }.onFailure {
+                    if (!silent) emitToast(strings().toastFamilySyncError)
+                }
+            } finally {
+                if (!isBackgroundPoll) {
+                    modalFlow.update { it.copy(isSyncingFamily = false) }
+                }
+                syncInFlight.set(false)
             }
         }
     }
 
     fun leaveFamilyGroup() {
         viewModelScope.launch {
+            lastRemoteCipherHash = ""
+            lastLocalStateHash = ""
             repository.clearFamilyGroup()
             closeFamilyDialog()
             emitToast(strings().toastFamilyLeft)

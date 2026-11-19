@@ -4,13 +4,28 @@ import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.KeyboardType
 import com.bunkerstock.app.data.FamilyGroupConfig
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -82,6 +97,8 @@ fun SettingsScreen(
     isSyncingFamily: Boolean,
     onOpenFamilyDialog: () -> Unit,
     onSyncFamilyNow: () -> Unit,
+    onFamilySyncPrefsChange: (Boolean, Int) -> Unit,
+    onUpdateMemberName: (String) -> Unit,
     onLanguageChange: (AppLanguage) -> Unit,
     onThemeModeChange: (AppThemeMode) -> Unit,
     onWaterConfigChange: (Int, Int) -> Unit,
@@ -99,6 +116,12 @@ fun SettingsScreen(
 ) {
     val strings = LocalAppStrings.current
     val colors = LocalBunkerColors.current
+    var showEditMemberDialog by remember { mutableStateOf(false) }
+    var memberNameDraft by remember(familyGroup.memberName) { mutableStateOf(familyGroup.memberName) }
+
+    var expiredInput by remember(settings.expiredThresholdDays) { mutableStateOf(settings.expiredThresholdDays.toString()) }
+    var criticalInput by remember(settings.criticalThresholdDays) { mutableStateOf(settings.criticalThresholdDays.toString()) }
+    var warningInput by remember(settings.warningThresholdDays) { mutableStateOf(settings.warningThresholdDays.toString()) }
 
     val notifPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -148,6 +171,84 @@ fun SettingsScreen(
                     subtitle = strings.familyE2eNote,
                     onClick = onSyncFamilyNow
                 )
+                // User display name row with edit icon inside Family Group settings
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(role = Role.Button) {
+                            memberNameDraft = familyGroup.memberName
+                            showEditMemberDialog = true
+                        }
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(Icons.Default.Person, contentDescription = null, tint = colors.cyan, modifier = Modifier.size(22.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (familyGroup.memberName.isNotBlank()) {
+                                strings.familyYourUser(familyGroup.memberName)
+                            } else {
+                                strings.familyYourUserEmpty
+                            },
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = strings.familyEditUserTitle,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.mutedText
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = strings.familyEditUserTitle,
+                        tint = colors.emerald,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                // Auto-sync diff polling toggle & interval (changeable + disableable)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(Icons.Default.Schedule, contentDescription = null, tint = colors.emerald, modifier = Modifier.size(22.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(strings.familyAutoSync, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            strings.familyAutoSyncSub,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.mutedText
+                        )
+                    }
+                    Switch(
+                        checked = settings.familyAutoSyncEnabled,
+                        onCheckedChange = { enabled ->
+                            onFamilySyncPrefsChange(enabled, settings.familySyncIntervalSec)
+                        }
+                    )
+                }
+                if (settings.familyAutoSyncEnabled) {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                        StepperSettingRow(
+                            icon = Icons.Default.Schedule,
+                            iconTint = colors.amber,
+                            label = strings.familySyncInterval,
+                            value = settings.familySyncIntervalSec,
+                            onDecrement = {
+                                val next = (settings.familySyncIntervalSec - 5).coerceAtLeast(5)
+                                onFamilySyncPrefsChange(true, next)
+                            },
+                            onIncrement = {
+                                val next = (settings.familySyncIntervalSec + 5).coerceAtMost(300)
+                                onFamilySyncPrefsChange(true, next)
+                            }
+                        )
+                    }
+                }
             } else {
                 SettingsActionRow(
                     icon = Icons.Default.Group,
@@ -283,60 +384,115 @@ fun SettingsScreen(
             }
             HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.7f))
 
-            // SECTION 2B: EXPIRY THRESHOLDS (DAYS)
+            // SECTION 2B: EXPIRY THRESHOLDS (DAYS) — direct numeric inputs + single Reset button
             SettingsSectionLabel(strings.settingsSectionThresholds)
             Column(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                StepperSettingRow(
-                    icon = Icons.Default.Warning,
-                    iconTint = colors.danger,
-                    label = strings.thresholdExpiredDays,
-                    value = settings.expiredThresholdDays,
-                    onDecrement = {
-                        onExpiryThresholdsChange(
-                            (settings.expiredThresholdDays - 1).coerceAtLeast(0),
-                            settings.criticalThresholdDays,
-                            settings.warningThresholdDays
-                        )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = expiredInput,
+                        onValueChange = { raw ->
+                            val clean = raw.filter { it.isDigit() }.take(2)
+                            expiredInput = clean
+                            clean.toIntOrNull()?.let { v ->
+                                onExpiryThresholdsChange(v, settings.criticalThresholdDays, settings.warningThresholdDays)
+                            }
+                        },
+                        label = { Text(strings.statusExpired, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        textStyle = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = FontFamily.Monospace,
+                            color = colors.danger,
+                            textAlign = TextAlign.Center
+                        ),
+                        shape = RoundedCornerShape(BunkerRadius.Control),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = colors.canvas,
+                            unfocusedContainerColor = colors.canvas,
+                            focusedBorderColor = colors.danger,
+                            unfocusedBorderColor = colors.borderSubtle
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = criticalInput,
+                        onValueChange = { raw ->
+                            val clean = raw.filter { it.isDigit() }.take(3)
+                            criticalInput = clean
+                            clean.toIntOrNull()?.let { v ->
+                                if (v > settings.expiredThresholdDays) {
+                                    onExpiryThresholdsChange(settings.expiredThresholdDays, v, settings.warningThresholdDays.coerceAtLeast(v + 1))
+                                }
+                            }
+                        },
+                        label = { Text(strings.statusCritical, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        textStyle = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = FontFamily.Monospace,
+                            color = colors.amber,
+                            textAlign = TextAlign.Center
+                        ),
+                        shape = RoundedCornerShape(BunkerRadius.Control),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = colors.canvas,
+                            unfocusedContainerColor = colors.canvas,
+                            focusedBorderColor = colors.amber,
+                            unfocusedBorderColor = colors.borderSubtle
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = warningInput,
+                        onValueChange = { raw ->
+                            val clean = raw.filter { it.isDigit() }.take(3)
+                            warningInput = clean
+                            clean.toIntOrNull()?.let { v ->
+                                if (v > settings.criticalThresholdDays) {
+                                    onExpiryThresholdsChange(settings.expiredThresholdDays, settings.criticalThresholdDays, v)
+                                }
+                            }
+                        },
+                        label = { Text(strings.statusWarning, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        textStyle = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = FontFamily.Monospace,
+                            color = colors.warning,
+                            textAlign = TextAlign.Center
+                        ),
+                        shape = RoundedCornerShape(BunkerRadius.Control),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = colors.canvas,
+                            unfocusedContainerColor = colors.canvas,
+                            focusedBorderColor = colors.warning,
+                            unfocusedBorderColor = colors.borderSubtle
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        expiredInput = "0"
+                        criticalInput = "30"
+                        warningInput = "90"
+                        onExpiryThresholdsChange(0, 30, 90)
                     },
-                    onIncrement = {
-                        onExpiryThresholdsChange(
-                            (settings.expiredThresholdDays + 1).coerceAtMost(30),
-                            settings.criticalThresholdDays,
-                            settings.warningThresholdDays
-                        )
-                    }
-                )
-                StepperSettingRow(
-                    icon = Icons.Default.HourglassBottom,
-                    iconTint = colors.amber,
-                    label = strings.thresholdCriticalDays,
-                    value = settings.criticalThresholdDays,
-                    onDecrement = {
-                        val next = (settings.criticalThresholdDays - 5).coerceAtLeast(settings.expiredThresholdDays + 1)
-                        onExpiryThresholdsChange(settings.expiredThresholdDays, next, settings.warningThresholdDays)
-                    },
-                    onIncrement = {
-                        val next = (settings.criticalThresholdDays + 5).coerceAtMost(365)
-                        onExpiryThresholdsChange(settings.expiredThresholdDays, next, settings.warningThresholdDays)
-                    }
-                )
-                StepperSettingRow(
-                    icon = Icons.Default.HourglassBottom,
-                    iconTint = colors.warning,
-                    label = strings.thresholdWarningDays,
-                    value = settings.warningThresholdDays,
-                    onDecrement = {
-                        val next = (settings.warningThresholdDays - 10).coerceAtLeast(settings.criticalThresholdDays + 1)
-                        onExpiryThresholdsChange(settings.expiredThresholdDays, settings.criticalThresholdDays, next)
-                    },
-                    onIncrement = {
-                        val next = (settings.warningThresholdDays + 10).coerceAtMost(730)
-                        onExpiryThresholdsChange(settings.expiredThresholdDays, settings.criticalThresholdDays, next)
-                    }
-                )
+                    shape = RoundedCornerShape(BunkerRadius.Control),
+                    border = BorderStroke(1.dp, colors.borderSubtle),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(strings.thresholdResetDefault, style = MaterialTheme.typography.labelLarge)
+                }
             }
             HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.7f))
 
@@ -478,6 +634,39 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(28.dp))
         }
+    }
+
+    if (showEditMemberDialog) {
+        AlertDialog(
+            onDismissRequest = { showEditMemberDialog = false },
+            title = { Text(strings.familyEditUserTitle, fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = memberNameDraft,
+                    onValueChange = { memberNameDraft = it },
+                    label = { Text(strings.familyMemberNameLabel) },
+                    placeholder = { Text(strings.familyMemberNamePlaceholder) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onUpdateMemberName(memberNameDraft)
+                        showEditMemberDialog = false
+                    },
+                    shape = RoundedCornerShape(BunkerRadius.Control)
+                ) {
+                    Text(strings.save, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditMemberDialog = false }) {
+                    Text(strings.cancel)
+                }
+            }
+        )
     }
 }
 

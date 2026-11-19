@@ -43,6 +43,7 @@ data class InventoryItem(
     val imageUri: String? = null,
     val nutrition: ProductNutrition? = null,
     val batches: List<ExpiryBatch> = emptyList(),
+    val addedBy: String = "",
     val updatedAt: Long = 0L,
     val updatedBy: String = ""
 )
@@ -173,6 +174,8 @@ data class AppSettings(
     val expiredThresholdDays: Int = 0,
     val criticalThresholdDays: Int = 30,
     val warningThresholdDays: Int = 90,
+    val familyAutoSyncEnabled: Boolean = true,
+    val familySyncIntervalSec: Int = 15,
     val onboardingCompleted: Boolean = true
 )
 
@@ -200,6 +203,15 @@ data class DetectedScanCandidate(
     val existingItemId: String? = null,
     val prefill: ItemPrefill? = null,
     val isLookingUp: Boolean = false
+)
+
+data class ShoppingScanEntry(
+    val itemId: String,
+    val barcode: String,
+    val name: String,
+    val addedQty: Double = 1.0,
+    val isNew: Boolean = false,
+    val isEnriching: Boolean = false
 )
 
 data class AppUpdateInfo(

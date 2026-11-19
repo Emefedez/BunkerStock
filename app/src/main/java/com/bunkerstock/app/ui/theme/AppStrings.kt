@@ -286,6 +286,22 @@ interface AppStrings {
     val detailNutriScoreLabel: String
     val detailNoScore: String
     val detailBatchesBadge: (Int) -> String
+    val detailAddedBy: (String) -> String
+    val detailPer100g: String
+    val detailChartScale: String
+    val detailTapPhotoHint: String
+    val familyAutoSync: String
+    val familyAutoSyncSub: String
+    val familySyncInterval: String
+    val familyYourUser: (String) -> String
+    val familyYourUserEmpty: String
+    val familyEditUserTitle: String
+    val toastFamilyUserSaved: String
+    val thresholdResetDefault: String
+    val shoppingModeLabel: String
+    val shoppingModeActiveHint: String
+    val shoppingDoneBtn: (Int) -> String
+    val shoppingResolving: String
 
     fun kpiCriticalTitle(criticalDays: Int): String = when (language) {
         AppLanguage.ES -> "PRÓX. $criticalDays DÍAS"
@@ -591,7 +607,7 @@ object SpanishStrings : AppStrings {
     override val clearAll = "Vaciar todo el almacén"
     override val clearAllSub = "Elimina permanentemente todos los registros"
     override val settingsSectionAbout = "ACERCA DE"
-    override val aboutDesc = "BunkerStock v3.1 · Control logístico familiar de inventario, salud nutricional y caducidad con sincronización cifrada."
+    override val aboutDesc = "BunkerStock v3.2 · Control logístico familiar de inventario, salud nutricional y caducidad con sincronización cifrada."
     override val confirmDeleteTitle = "Eliminar Artículo"
     override val confirmDeleteMsg: (String) -> String = { "¿Seguro que deseas eliminar \"$it\" del inventario?" }
     override val confirmDemoTitle = "Restaurar Datos de Ejemplo"
@@ -705,6 +721,22 @@ object SpanishStrings : AppStrings {
     override val detailNutriScoreLabel = "NUTRI-SCORE"
     override val detailNoScore = "Sin datos"
     override val detailBatchesBadge: (Int) -> String = { "$it tandadas" }
+    override val detailAddedBy: (String) -> String = { "Añadido por $it" }
+    override val detailPer100g = "POR 100 G"
+    override val detailChartScale = "Barras en escala común de 0–100 g"
+    override val detailTapPhotoHint = "Toca la foto para ampliar"
+    override val familyAutoSync = "Sincronización automática (diffs)"
+    override val familyAutoSyncSub = "Comprueba cambios en el grupo mientras la app está abierta"
+    override val familySyncInterval = "Comprobar cada (seg.)"
+    override val familyYourUser: (String) -> String = { "Tu usuario: $it" }
+    override val familyYourUserEmpty = "Configura tu nombre de usuario"
+    override val familyEditUserTitle = "Cambiar nombre de usuario"
+    override val toastFamilyUserSaved = "Nombre de usuario guardado"
+    override val thresholdResetDefault = "Restablecer (0 / 30 / 90)"
+    override val shoppingModeLabel = "Modo Compra"
+    override val shoppingModeActiveHint = "Escanea productos seguidos: se añaden solos al búnker"
+    override val shoppingDoneBtn: (Int) -> String = { "Terminar compra ($it)" }
+    override val shoppingResolving = "Identificando..."
 }
 
 object EnglishStrings : AppStrings {
@@ -849,7 +881,7 @@ object EnglishStrings : AppStrings {
     override val clearAll = "Clear all inventory"
     override val clearAllSub = "Permanently deletes all records"
     override val settingsSectionAbout = "ABOUT"
-    override val aboutDesc = "BunkerStock v3.1 · Family logistics, product health scoring & expiry control with E2E encrypted sync."
+    override val aboutDesc = "BunkerStock v3.2 · Family logistics, product health scoring & expiry control with E2E encrypted sync."
     override val confirmDeleteTitle = "Delete Item"
     override val confirmDeleteMsg: (String) -> String = { "Are you sure you want to delete \"$it\" from inventory?" }
     override val confirmDemoTitle = "Restore Sample Data"
@@ -963,6 +995,22 @@ object EnglishStrings : AppStrings {
     override val detailNutriScoreLabel = "NUTRI-SCORE"
     override val detailNoScore = "No data"
     override val detailBatchesBadge: (Int) -> String = { "$it batches" }
+    override val detailAddedBy: (String) -> String = { "Added by $it" }
+    override val detailPer100g = "PER 100 G"
+    override val detailChartScale = "Bars share a 0–100 g scale"
+    override val detailTapPhotoHint = "Tap photo to zoom"
+    override val familyAutoSync = "Auto-sync diffs"
+    override val familyAutoSyncSub = "Checks for group changes while the app is open"
+    override val familySyncInterval = "Check every (sec.)"
+    override val familyYourUser: (String) -> String = { "Your user: $it" }
+    override val familyYourUserEmpty = "Set your display name"
+    override val familyEditUserTitle = "Edit your username"
+    override val toastFamilyUserSaved = "Username updated"
+    override val thresholdResetDefault = "Reset (0 / 30 / 90)"
+    override val shoppingModeLabel = "Shopping Mode"
+    override val shoppingModeActiveHint = "Scan items back-to-back — auto-added to your stock"
+    override val shoppingDoneBtn: (Int) -> String = { "Finish haul ($it)" }
+    override val shoppingResolving = "Identifying..."
 }
 
 fun stringsFor(language: AppLanguage): AppStrings = when (language) {

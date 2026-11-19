@@ -86,7 +86,7 @@ object OpenFoodFactsClient {
                 requestMethod = "GET"
                 connectTimeout = 3500
                 readTimeout = 3500
-                setRequestProperty("User-Agent", "BunkerStock-Android/2.5")
+                setRequestProperty("User-Agent", "BunkerStock-Android/3.2")
             }
             if (conn.responseCode !in 200..299) return@withContext null
 
@@ -123,7 +123,10 @@ object OpenFoodFactsClient {
             val grade = gradeRaw.takeIf { it in listOf("A", "B", "C", "D", "E") }
             val nova = product["nova_group"]?.jsonPrimitive?.intOrNull
             val additivesN = product["additives_n"]?.jsonPrimitive?.intOrNull
-            val imageUrl = pStr("image_front_small_url").ifEmpty { pStr("image_front_url") }.ifEmpty { null }
+            val imageUrl = pStr("image_front_url")
+                .ifEmpty { pStr("image_url") }
+                .ifEmpty { pStr("image_front_small_url") }
+                .ifEmpty { null }
 
             val nutriments = product["nutriments"] as? JsonObject
             fun nutr(key: String): Double? =

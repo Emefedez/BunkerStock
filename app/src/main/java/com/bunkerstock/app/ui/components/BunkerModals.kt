@@ -343,52 +343,16 @@ fun ItemEditorSheet(
                 }
             }
 
-            // Quantity & Unit Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedTextField(
-                    value = qtyText,
-                    onValueChange = { qtyText = it },
-                    label = { Text(strings.fieldQuantity) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace),
-                    modifier = Modifier.weight(0.42f)
-                )
-
-                ExposedDropdownMenuBox(
-                    expanded = unitExpanded,
-                    onExpandedChange = { unitExpanded = !unitExpanded },
-                    modifier = Modifier.weight(0.58f)
-                ) {
-                    OutlinedTextField(
-                        value = strings.unitLabel(unit),
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text(strings.fieldUnit) },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = unitExpanded) },
-                        modifier = Modifier
-                            .menuAnchor()
-                            .fillMaxWidth()
-                    )
-                    ExposedDropdownMenu(
-                        expanded = unitExpanded,
-                        onDismissRequest = { unitExpanded = false }
-                    ) {
-                        ItemUnit.entries.forEach { u ->
-                            DropdownMenuItem(
-                                text = { Text(strings.unitLabel(u)) },
-                                onClick = {
-                                    unit = u
-                                    unitExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-            }
+            // Quantity (full-width — unit selector removed for cleaner UX)
+            OutlinedTextField(
+                value = qtyText,
+                onValueChange = { qtyText = it },
+                label = { Text(strings.fieldQuantity) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace),
+                modifier = Modifier.fillMaxWidth()
+            )
 
             // No Expiry Switch
             Row(
@@ -493,7 +457,8 @@ fun ItemEditorSheet(
                             notes = notes.trim(),
                             imageUri = imageUri,
                             nutrition = nutrition,
-                            batches = editingItem?.batches.orEmpty()
+                            batches = editingItem?.batches.orEmpty(),
+                            addedBy = editingItem?.addedBy.orEmpty()
                         )
                         onSave(item, isEdit)
                     },
@@ -600,7 +565,7 @@ fun QuickScanActionSheet(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(strings.qsCurrentStock, style = MaterialTheme.typography.labelSmall, color = colors.mutedText)
                             Text(
-                                "${InventoryLogic.formatQty(item.qty)} ${strings.unitLabel(unit)}",
+                                InventoryLogic.formatQty(item.qty),
                                 style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace)
                             )
                         }

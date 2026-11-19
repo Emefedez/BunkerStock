@@ -37,11 +37,11 @@ object ProductImageStore {
                 val bmp = context.contentResolver.openInputStream(uri)?.use {
                     BitmapFactory.decodeStream(it)
                 } ?: return@runCatching null
-                val scaled = scaleDown(bmp, 512)
+                val scaled = scaleDown(bmp, 1200)
                 val dir = File(context.filesDir, "product_images").apply { mkdirs() }
                 val file = File(dir, "custom_${itemId}_${System.currentTimeMillis()}.jpg")
                 FileOutputStream(file).use { out ->
-                    scaled.compress(Bitmap.CompressFormat.JPEG, 86, out)
+                    scaled.compress(Bitmap.CompressFormat.JPEG, 90, out)
                 }
                 file.absolutePath
             }.getOrNull()
@@ -84,7 +84,7 @@ object ProductImageStore {
         if (lookupKey == "|" || negativeCache.containsKey(lookupKey)) return@withContext null
 
         val cacheDir = File(context.cacheDir, "product_img_cache").apply { mkdirs() }
-        val cacheFile = File(cacheDir, "auto_${hashKey(lookupKey)}.jpg")
+        val cacheFile = File(cacheDir, "auto_hd_${hashKey(lookupKey)}.jpg")
         if (cacheFile.exists() && cacheFile.length() > 0) {
             return@withContext BitmapFactory.decodeFile(cacheFile.absolutePath)
         }
@@ -123,11 +123,11 @@ object ProductImageStore {
 
     private fun searchOpenFoodFactsImage(query: String): String? = runCatching {
         val encoded = URLEncoder.encode(query, "UTF-8")
-        val url = "https://world.openfoodfacts.org/cgi/search.pl?search_terms=$encoded&search_simple=1&action=process&json=1&page_size=3&fields=image_front_small_url,image_front_url"
+        val url = "https://world.openfoodfacts.org/cgi/search.pl?search_terms=$encoded&search_simple=1&action=process&json=1&page_size=3&fields=image_front_url,image_url,image_front_small_url"
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 3500
             readTimeout = 3500
-            setRequestProperty("User-Agent", "BunkerStock-Android/3.0")
+            setRequestProperty("User-Agent", "BunkerStock-Android/3.2")
         }
         try {
             if (conn.responseCode !in 200..299) return@runCatching null
@@ -136,8 +136,9 @@ object ProductImageStore {
             val products = root["products"] as? JsonArray ?: return@runCatching null
             for (el in products) {
                 val obj = el as? JsonObject ?: continue
-                val img = obj["image_front_small_url"]?.jsonPrimitive?.contentOrNull
-                    ?: obj["image_front_url"]?.jsonPrimitive?.contentOrNull
+                val img = obj["image_front_url"]?.jsonPrimitive?.contentOrNull
+                    ?: obj["image_url"]?.jsonPrimitive?.contentOrNull
+                    ?: obj["image_front_small_url"]?.jsonPrimitive?.contentOrNull
                 if (!img.isNullOrBlank() && img.startsWith("http")) return@runCatching img
             }
             null
@@ -172,14 +173,14 @@ object ProductImageStore {
             connectTimeout = 4000
             readTimeout = 4000
             instanceFollowRedirects = true
-            setRequestProperty("User-Agent", "BunkerStock-Android/3.0")
+            setRequestProperty("User-Agent", "BunkerStock-Android/3.2")
         }
         return try {
             if (conn.responseCode !in 200..299) return null
             val raw = conn.inputStream.use { BitmapFactory.decodeStream(it) } ?: return null
-            val scaled = scaleDown(raw, 400)
+            val scaled = scaleDown(raw, 1200)
             FileOutputStream(cacheFile).use { out ->
-                scaled.compress(Bitmap.CompressFormat.JPEG, 85, out)
+                scaled.compress(Bitmap.CompressFormat.JPEG, 90, out)
             }
             scaled
         } catch (_: Exception) {

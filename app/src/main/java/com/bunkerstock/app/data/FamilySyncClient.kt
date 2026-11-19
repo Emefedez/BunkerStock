@@ -22,11 +22,34 @@ import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
+data class FamilySyncResult(
+    val items: List<InventoryItem>,
+    val deletedIds: Map<String, Long>,
+    val config: FamilyGroupConfig,
+    val localChanged: Boolean,
+    val remoteUploaded: Boolean,
+    val remoteCipherHash: String,
+    val localStateHash: String
+)
+
 object FamilySyncClient {
 
     const val DEFAULT_SERVER = "https://textdb.dev/api/data"
     private const val GCM_IV_BYTES = 12
     private const val GCM_TAG_BITS = 128
+
+    fun sha256Hex(input: String): String =
+        MessageDigest.getInstance("SHA-256")
+            .digest(input.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+
+    fun computeStateHash(items: List<InventoryItem>, deletedIds: Map<String, Long>): String {
+        val canonical = sanitizeForUpload(items).sortedBy { it.id }
+        val deletedSorted = deletedIds.toSortedMap()
+        return sha256Hex(
+            InventoryLogic.json.encodeToString(canonical) + "|" + InventoryLogic.json.encodeToString(deletedSorted)
+        )
+    }
 
     fun generateSecretKey(): String {
         val bytes = ByteArray(16)
@@ -220,7 +243,9 @@ object FamilySyncClient {
             val roomId = generateRoomId()
             val secret = generateSecretKey()
             val stamped = sanitizeForUpload(localItems).map {
-                if (it.updatedAt == 0L) it.copy(updatedAt = now, updatedBy = memberName) else it
+                val author = it.addedBy.ifBlank { memberName.trim() }
+                if (it.updatedAt == 0L) it.copy(addedBy = author, updatedAt = now, updatedBy = memberName.trim())
+                else it.copy(addedBy = author)
             }
             val snapshot = FamilySyncSnapshot(
                 groupName = groupName.trim().ifBlank { "Familia" },
@@ -248,11 +273,51 @@ object FamilySyncClient {
         localItems: List<InventoryItem>,
         localDeleted: Map<String, Long>,
         isInitialJoin: Boolean = false
-    ): Result<Triple<List<InventoryItem>, Map<String, Long>, FamilyGroupConfig>> = withContext(Dispatchers.IO) {
+    ): Result<Triple<List<InventoryItem>, Map<String, Long>, FamilyGroupConfig>> =
+        syncGroupDiff(
+            config = config,
+            localItems = localItems,
+            localDeleted = localDeleted,
+            isInitialJoin = isInitialJoin
+        ).map { Triple(it.items, it.deletedIds, it.config) }
+
+    /**
+     * Diff-aware family sync:
+     * 1. Fetches remote encrypted blob and hashes it; if neither remote nor local changed since last sync, skips merge & upload.
+     * 2. Merges via LWW when any diff exists, updates local only if changed, and uploads only if merged state differs from remote.
+     */
+    suspend fun syncGroupDiff(
+        config: FamilyGroupConfig,
+        localItems: List<InventoryItem>,
+        localDeleted: Map<String, Long>,
+        isInitialJoin: Boolean = false,
+        lastRemoteHash: String = "",
+        lastLocalHash: String = ""
+    ): Result<FamilySyncResult> = withContext(Dispatchers.IO) {
         runCatching {
             val endpoint = "${config.serverBaseUrl.trimEnd('/')}/${config.roomId}"
             val cipherIn = readCipherFromEndpoint(endpoint)
                 ?: error("Grupo no encontrado en el servidor")
+            val remoteCipherHash = sha256Hex(cipherIn)
+            val currentLocalHash = computeStateHash(localItems, localDeleted)
+
+            // Fast path: zero remote diffs AND zero local diffs since last sync!
+            if (!isInitialJoin &&
+                lastRemoteHash.isNotEmpty() &&
+                remoteCipherHash == lastRemoteHash &&
+                currentLocalHash == lastLocalHash
+            ) {
+                return@runCatching FamilySyncResult(
+                    items = localItems,
+                    deletedIds = localDeleted,
+                    config = config,
+                    localChanged = false,
+                    remoteUploaded = false,
+                    remoteCipherHash = remoteCipherHash,
+                    localStateHash = currentLocalHash
+                )
+            }
+
             val remoteSnapshot = decryptSnapshot(cipherIn, config.secretKey)
                 ?: error("No se pudo descifrar el grupo (clave incorrecta)")
 
@@ -263,24 +328,41 @@ object FamilySyncClient {
             }
 
             val (mergedItems, mergedDeleted) = mergeSnapshots(effectiveLocal, localDeleted, remoteSnapshot)
+            val mergedStateHash = computeStateHash(mergedItems, mergedDeleted)
+            val remoteStateHash = computeStateHash(remoteSnapshot.items, remoteSnapshot.deletedIds)
+
+            val localChanged = isInitialJoin || (mergedStateHash != currentLocalHash) ||
+                (mergedItems.size != localItems.size)
+            val needsUpload = mergedStateHash != remoteStateHash
+
             val now = System.currentTimeMillis()
-            val updatedSnapshot = FamilySyncSnapshot(
+            val finalCipherHash = if (needsUpload) {
+                val updatedSnapshot = FamilySyncSnapshot(
+                    groupName = remoteSnapshot.groupName.ifBlank { config.groupName },
+                    items = sanitizeForUpload(mergedItems),
+                    deletedIds = mergedDeleted,
+                    updatedAt = now
+                )
+                val cipherOut = encryptSnapshot(updatedSnapshot, config.secretKey)
+                writeCipherToEndpoint(endpoint, cipherOut)
+                sha256Hex(cipherOut)
+            } else {
+                remoteCipherHash
+            }
+
+            val updatedConfig = config.copy(
                 groupName = remoteSnapshot.groupName.ifBlank { config.groupName },
-                items = sanitizeForUpload(mergedItems),
-                deletedIds = mergedDeleted,
-                updatedAt = now
+                lastSyncedAt = if (localChanged || needsUpload || config.lastSyncedAt == 0L) now else config.lastSyncedAt
             )
 
-            val cipherOut = encryptSnapshot(updatedSnapshot, config.secretKey)
-            writeCipherToEndpoint(endpoint, cipherOut)
-
-            Triple(
-                mergedItems,
-                mergedDeleted,
-                config.copy(
-                    groupName = updatedSnapshot.groupName,
-                    lastSyncedAt = now
-                )
+            FamilySyncResult(
+                items = mergedItems,
+                deletedIds = mergedDeleted,
+                config = updatedConfig,
+                localChanged = localChanged,
+                remoteUploaded = needsUpload,
+                remoteCipherHash = finalCipherHash,
+                localStateHash = mergedStateHash
             )
         }
     }
