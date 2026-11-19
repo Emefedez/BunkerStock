@@ -31,12 +31,13 @@ jobs:
           gradle-version: '8.10.2'
 
       - name: Decode persistent signing keystore
-        if: secrets.SIGNING_KEY_BASE64 != ''
         env:
           SIGNING_KEY_BASE64: ${{ secrets.SIGNING_KEY_BASE64 }}
         run: |
-          echo "$SIGNING_KEY_BASE64" | base64 --decode > "${RUNNER_TEMP}/bunkerstock.jks"
-          echo "SIGNING_STORE_FILE=${RUNNER_TEMP}/bunkerstock.jks" >> "$GITHUB_ENV"
+          if [ -n "$SIGNING_KEY_BASE64" ]; then
+            echo "$SIGNING_KEY_BASE64" | base64 --decode > "${RUNNER_TEMP}/bunkerstock.jks"
+            echo "SIGNING_STORE_FILE=${RUNNER_TEMP}/bunkerstock.jks" >> "$GITHUB_ENV"
+          fi
 
       - name: Run unit tests
         run: gradle testDebugUnitTest --stacktrace

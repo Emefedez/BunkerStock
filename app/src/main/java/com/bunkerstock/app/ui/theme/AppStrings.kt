@@ -345,7 +345,7 @@ data class AppStrings(
 
 val SpanishStrings = AppStrings(
     language = AppLanguage.ES,
-    brandBunker = "BÚNKER",
+    brandBunker = "BUNKER",
     brandStock = "STOCK",
     brandSubtitle = "Control Logístico & Caducidad",
     navWarehouse = "Almacén",
@@ -418,7 +418,7 @@ val SpanishStrings = AppStrings(
     fieldBarcode = "Código de barras / QR",
     fieldBarcodePlaceholder = "EAN-13, UPC o código BNK",
     fieldCategory = "Categoría",
-    fieldLocation = "Ubicación en el búnker",
+    fieldLocation = "Ubicación en el bunker",
     fieldLocationPlaceholder = "Ej. Estantería 1 - Balda B",
     fieldQuantity = "Cantidad *",
     fieldUnit = "Unidad",
@@ -455,7 +455,7 @@ val SpanishStrings = AppStrings(
     qsEditItem = "Editar ficha",
     qsScanAnother = "Escanear otro",
     qrModalTitle = "Etiqueta QR de Almacén",
-    qrHeaderBrand = "BÚNKERSTOCK LOGÍSTICA",
+    qrHeaderBrand = "BUNKERSTOCK LOGÍSTICA",
     qrMetaFormat = { code, date -> "COD: $code | CAD: $date" },
     qrPrint = "Imprimir",
     qrSharePng = "Compartir PNG",
@@ -470,7 +470,7 @@ val SpanishStrings = AppStrings(
     themeLight = "Claro",
     themeSystem = "Sistema",
     settingsSectionAutonomy = "AUTONOMÍA HÍDRICA",
-    settingsWaterPersons = "Personas en el búnker",
+    settingsWaterPersons = "Personas en el bunker",
     settingsWaterLiters = "Litros por persona / día",
     settingsWaterFormula = { p, l, total -> "$p pers. × ${l}L = ${total}L / día" },
     settingsSectionData = "DATOS Y COPIAS DE SEGURIDAD",
@@ -485,7 +485,7 @@ val SpanishStrings = AppStrings(
     clearAll = "Vaciar todo el almacén",
     clearAllSub = "Elimina permanentemente todos los registros",
     settingsSectionAbout = "ACERCA DE",
-    aboutDesc = "BúnkerStock v2.6 · Control logístico de inventario, salud nutricional y caducidad diseñado para operación offline.",
+    aboutDesc = "BunkerStock v2.6 · Control logístico de inventario, salud nutricional y caducidad diseñado para operación offline.",
     confirmDeleteTitle = "Eliminar Artículo",
     confirmDeleteMsg = { "¿Seguro que deseas eliminar \"$it\" del inventario?" },
     confirmDemoTitle = "Restaurar Datos de Ejemplo",
@@ -531,7 +531,7 @@ val SpanishStrings = AppStrings(
     updateDialogTitle = { "Actualización v$it disponible" },
     updateInstallNow = "Descargar e instalar",
     updateDownloading = "Descargando actualización...",
-    updateUpToDate = "BúnkerStock ya está actualizado",
+    updateUpToDate = "BunkerStock ya está actualizado",
     updateFailed = "No se pudo comprobar/descargar la actualización"
 )
 

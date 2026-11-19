@@ -60,39 +60,38 @@ fun BunkerGrainOverlay(
     }
 }
 
-// Core Bunker Palette
-val Slate950 = Color(0xFF090D16)
-val Slate900 = Color(0xFF0F172A)
-val Slate850 = Color(0xFF161F30)
-val Slate800 = Color(0xFF1E293B)
-val Slate700 = Color(0xFF334155)
-val Slate500 = Color(0xFF64748B)
-val Slate400 = Color(0xFF94A3B8)
-val Slate300 = Color(0xFFCBD5E1)
-val Slate100 = Color(0xFFF1F5F9)
+// Nuclear Concrete & Gunmetal Bunker Palette (zero navy blue)
+val BunkerCharcoal950 = Color(0xFF111312) // Deep bunker concrete
+val BunkerConcrete900 = Color(0xFF191C1A) // Armored panel surface
+val BunkerSteel850    = Color(0xFF222623) // Elevated gunmetal
+val BunkerSteel800    = Color(0xFF2D332E) // Border / divider
+val BunkerSteel700    = Color(0xFF3F4741) // Stronger outline
+val BunkerAsh400      = Color(0xFF9AA39C) // Muted technical text
+val BunkerAsh300      = Color(0xFFC5CDC7) // Secondary light text
+val BunkerAsh100      = Color(0xFFEAEFEA) // Primary crisp phosphor-white text
 
-val Emerald500 = Color(0xFF10B981)
-val Emerald400 = Color(0xFF34D399)
-val Emerald700 = Color(0xFF047857)
+val GeigerGreen500    = Color(0xFF22C55E) // Phosphor tactical green
+val GeigerGreen400    = Color(0xFF4ADE80)
+val GeigerGreen700    = Color(0xFF15803D)
 
-val Amber500 = Color(0xFFF59E0B)
-val Amber400 = Color(0xFFFBBF24)
-val Amber700 = Color(0xFFB45309)
+val RadAmber500       = Color(0xFFEAB308) // Radiation hazard yellow-amber
+val RadAmber400       = Color(0xFFFACC15)
+val RadAmber700       = Color(0xFFA16207)
 
-val Yellow400 = Color(0xFFFACC15)
-val Yellow700 = Color(0xFFA16207)
+val CautionYellow400  = Color(0xFFFDE047)
+val CautionYellow700  = Color(0xFF854D0E)
 
-val Red500 = Color(0xFFEF4444)
-val Red400 = Color(0xFFF87171)
-val Red700 = Color(0xFFB91C1C)
+val HazardRed500      = Color(0xFFEF4444)
+val HazardRed400      = Color(0xFFF87171)
+val HazardRed700      = Color(0xFFB91C1C)
 
-val Cyan400 = Color(0xFF22D3EE)
-val Cyan700 = Color(0xFF0E7490)
+val CoolantCyan400    = Color(0xFF38BDF8)
+val CoolantCyan700    = Color(0xFF0369A1)
 
-val Rose400 = Color(0xFFFB7185)
-val Rose700 = Color(0xFFBE123C)
+val MedRose400        = Color(0xFFFB7185)
+val MedRose700        = Color(0xFFBE123C)
 
-val Blue400 = Color(0xFF60A5FA)
+val SteelBlue400      = Color(0xFF93C5FD)
 
 @Immutable
 data class BunkerExtendedColors(
@@ -120,97 +119,97 @@ data class BunkerExtendedColors(
 
 private val DarkBunkerExtended = BunkerExtendedColors(
     isDark = true,
-    canvas = Slate950,
-    cardSurface = Slate900,
-    cardElevated = Slate850,
-    borderSubtle = Slate800,
-    emerald = Emerald400,
-    emeraldContainer = Color(0xFF0B2B23),
-    amber = Amber400,
-    amberContainer = Color(0xFF2E220D),
-    warning = Yellow400,
-    warningContainer = Color(0xFF2B260F),
-    danger = Red400,
-    dangerContainer = Color(0xFF331418),
-    dangerBannerBg = Color(0xFF3B1214),
-    cyan = Cyan400,
-    cyanContainer = Color(0xFF0C2632),
-    rose = Rose400,
-    roseContainer = Color(0xFF331420),
-    infoBlue = Blue400,
-    mutedText = Slate400
+    canvas = BunkerCharcoal950,
+    cardSurface = BunkerConcrete900,
+    cardElevated = BunkerSteel850,
+    borderSubtle = BunkerSteel800,
+    emerald = GeigerGreen400,
+    emeraldContainer = Color(0xFF132619),
+    amber = RadAmber400,
+    amberContainer = Color(0xFF2B2610),
+    warning = CautionYellow400,
+    warningContainer = Color(0xFF292712),
+    danger = HazardRed400,
+    dangerContainer = Color(0xFF2E1616),
+    dangerBannerBg = Color(0xFF331515),
+    cyan = CoolantCyan400,
+    cyanContainer = Color(0xFF14242C),
+    rose = MedRose400,
+    roseContainer = Color(0xFF2D161E),
+    infoBlue = SteelBlue400,
+    mutedText = BunkerAsh400
 )
 
 private val LightBunkerExtended = BunkerExtendedColors(
     isDark = false,
-    canvas = Color(0xFFF1F5F9),
-    cardSurface = Color(0xFFFFFFFF),
-    cardElevated = Color(0xFFF8FAFC),
-    borderSubtle = Color(0xFFCBD5E1),
-    emerald = Emerald700,
-    emeraldContainer = Color(0xFFD1FAE5),
-    amber = Amber700,
-    amberContainer = Color(0xFFFEF3C7),
-    warning = Yellow700,
-    warningContainer = Color(0xFFFEF9C3),
-    danger = Red700,
+    canvas = Color(0xFFE7EAE6),
+    cardSurface = Color(0xFFF6F7F5),
+    cardElevated = Color(0xFFECEFE9),
+    borderSubtle = Color(0xFFC2C8C2),
+    emerald = GeigerGreen700,
+    emeraldContainer = Color(0xFFDCFCE7),
+    amber = RadAmber700,
+    amberContainer = Color(0xFFFEF9C3),
+    warning = CautionYellow700,
+    warningContainer = Color(0xFFFEF3C7),
+    danger = HazardRed700,
     dangerContainer = Color(0xFFFEE2E2),
     dangerBannerBg = Color(0xFFFEE2E2),
-    cyan = Cyan700,
-    cyanContainer = Color(0xFFCFFAFE),
-    rose = Rose700,
+    cyan = CoolantCyan700,
+    cyanContainer = Color(0xFFE0F2FE),
+    rose = MedRose700,
     roseContainer = Color(0xFFFFE4E6),
     infoBlue = Color(0xFF1D4ED8),
-    mutedText = Color(0xFF475569)
+    mutedText = Color(0xFF525B54)
 )
 
 val LocalBunkerColors = staticCompositionLocalOf { DarkBunkerExtended }
 
 private val BunkerDarkColorScheme = darkColorScheme(
-    primary = Emerald500,
-    onPrimary = Color(0xFF032117),
-    primaryContainer = Color(0xFF0B3529),
-    onPrimaryContainer = Color(0xFF6EE7B7),
-    secondary = Amber500,
-    onSecondary = Color(0xFF1F1402),
-    secondaryContainer = Color(0xFF38270A),
-    onSecondaryContainer = Color(0xFFFDE68A),
-    tertiary = Cyan400,
-    onTertiary = Color(0xFF04222A),
-    background = Slate950,
-    onBackground = Slate100,
-    surface = Slate900,
-    onSurface = Slate100,
-    surfaceVariant = Slate850,
-    onSurfaceVariant = Slate300,
-    outline = Slate700,
-    outlineVariant = Slate800,
-    error = Red400,
-    onError = Color(0xFF2D0606),
-    errorContainer = Color(0xFF3B1214),
+    primary = GeigerGreen500,
+    onPrimary = Color(0xFF071A0D),
+    primaryContainer = Color(0xFF132E1C),
+    onPrimaryContainer = Color(0xFF86EFAC),
+    secondary = RadAmber500,
+    onSecondary = Color(0xFF1C1604),
+    secondaryContainer = Color(0xFF2E2710),
+    onSecondaryContainer = Color(0xFFFEF08A),
+    tertiary = CoolantCyan400,
+    onTertiary = Color(0xFF08202B),
+    background = BunkerCharcoal950,
+    onBackground = BunkerAsh100,
+    surface = BunkerConcrete900,
+    onSurface = BunkerAsh100,
+    surfaceVariant = BunkerSteel850,
+    onSurfaceVariant = BunkerAsh300,
+    outline = BunkerSteel700,
+    outlineVariant = BunkerSteel800,
+    error = HazardRed400,
+    onError = Color(0xFF2B0707),
+    errorContainer = Color(0xFF331515),
     onErrorContainer = Color(0xFFFECACA)
 )
 
 private val BunkerLightColorScheme = lightColorScheme(
-    primary = Emerald700,
+    primary = GeigerGreen700,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFD1FAE5),
-    onPrimaryContainer = Color(0xFF064E3B),
-    secondary = Amber700,
+    primaryContainer = Color(0xFFDCFCE7),
+    onPrimaryContainer = Color(0xFF14532D),
+    secondary = RadAmber700,
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFFEF3C7),
-    onSecondaryContainer = Color(0xFF78350F),
-    tertiary = Cyan700,
+    secondaryContainer = Color(0xFFFEF9C3),
+    onSecondaryContainer = Color(0xFF713F12),
+    tertiary = CoolantCyan700,
     onTertiary = Color.White,
-    background = Color(0xFFF1F5F9),
-    onBackground = Color(0xFF0F172A),
-    surface = Color.White,
-    onSurface = Color(0xFF0F172A),
-    surfaceVariant = Color(0xFFE2E8F0),
-    onSurfaceVariant = Color(0xFF334155),
-    outline = Color(0xFF94A3B8),
-    outlineVariant = Color(0xFFCBD5E1),
-    error = Red700,
+    background = Color(0xFFE7EAE6),
+    onBackground = Color(0xFF141715),
+    surface = Color(0xFFF6F7F5),
+    onSurface = Color(0xFF141715),
+    surfaceVariant = Color(0xFFDCE1DC),
+    onSurfaceVariant = Color(0xFF374039),
+    outline = Color(0xFF8C968E),
+    outlineVariant = Color(0xFFC2C8C2),
+    error = HazardRed700,
     onError = Color.White,
     errorContainer = Color(0xFFFEE2E2),
     onErrorContainer = Color(0xFF7F1D1D)
