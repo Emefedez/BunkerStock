@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Tactical Corner Brackets inside safe zone -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#334155"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:pathData="M26,34 V26 H34 M74,26 H82 V34 M26,74 V82 H34 M74,82 H82 V74" />
+    <!-- Armored Bunker Shield Base -->
+    <path
+        android:fillColor="#0F172A"
+        android:strokeColor="#10B981"
+        android:strokeWidth="3.2"
+        android:strokeLineJoin="round"
+        android:pathData="M54,26 L75,34.5 V53 C75,66.2 66.2,76.8 54,82 C41.8,76.8 33,66.2 33,53 V34.5 Z" />
+    <!-- Left Emerald Tactical Half-Shield Fill -->
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M54,30.5 L37,37.4 V52.8 C37,63.4 43.9,72.1 54,76.8 Z" />
+    <!-- Right Darkened Steel Half with Vault Chevron -->
+    <path
+        android:fillColor="#162235"
+        android:pathData="M54,30.5 L71,37.4 V52.8 C71,63.4 64.1,72.1 54,76.8 Z" />
+    <!-- Central Bunker Check / Supply Crate Emblem -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#F59E0B"
+        android:strokeWidth="2.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M45,54 L51.5,60.5 L64,47.5" />
+</vector>
