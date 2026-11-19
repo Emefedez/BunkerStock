@@ -361,7 +361,7 @@ fun ScannerScreen(
             }
 
             // Non-blocking Bottom Detection Popup over viewfinder (camera stays live!)
-            AnimatedVisibility(
+            androidx.compose.animation.AnimatedVisibility(
                 visible = detectedCandidate != null,
                 enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
                 exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
