@@ -130,9 +130,9 @@ fun CriticalAlertBanner(
                 Box(
                     modifier = Modifier
                         .size(40.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(BunkerRadius.Control))
                         .background(colors.danger.copy(alpha = 0.18f))
-                        .border(1.dp, colors.danger.copy(alpha = 0.35f), RoundedCornerShape(12.dp)),
+                        .border(1.dp, colors.danger.copy(alpha = 0.35f), RoundedCornerShape(BunkerRadius.Control)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -172,7 +172,7 @@ fun CriticalAlertBanner(
                     containerColor = colors.danger,
                     contentColor = Color.White
                 ),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(BunkerRadius.Control),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(strings.reviewAffected, fontWeight = FontWeight.Bold)
@@ -656,9 +656,9 @@ fun InventoryItemCard(
                 // Tactile - qty + stepper
                 Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(14.dp))
+                        .clip(RoundedCornerShape(BunkerRadius.Control))
                         .background(colors.canvas)
-                        .border(1.dp, colors.borderSubtle, RoundedCornerShape(14.dp))
+                        .border(1.dp, colors.borderSubtle, RoundedCornerShape(BunkerRadius.Control))
                         .padding(horizontal = 2.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {

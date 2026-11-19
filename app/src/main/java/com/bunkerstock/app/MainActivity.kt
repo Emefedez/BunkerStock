@@ -300,7 +300,7 @@ private fun BunkerStockApp(
                                 border = BorderStroke(1.dp, colors.borderSubtle)
                             ) {
                                 Text(
-                                    text = "V2.5",
+                                    text = "V2.6",
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontFamily = FontFamily.Monospace,
                                         fontSize = 10.sp
@@ -456,8 +456,6 @@ private fun BunkerStockApp(
                     .fillMaxSize()
                     .background(colors.canvas)
             ) {
-                BunkerGrainOverlay(isDark = colors.isDark)
-
                 when {
                     state.scannerForForm || state.activeTab == BunkerTab.SCANNER -> {
                         ScannerScreen(
@@ -506,6 +504,9 @@ private fun BunkerStockApp(
                         )
                     }
                 }
+
+                // Matte tactile grain overlay over canvas & cards (non-intercepting)
+                BunkerGrainOverlay(isDark = colors.isDark)
             }
         }
     }

@@ -27,12 +27,12 @@ import androidx.compose.ui.unit.sp
 import com.bunkerstock.app.data.AppThemeMode
 import kotlin.random.Random
 
-/** Machined bunker corner radii: crisper & more tactical than default bubbly Material corners */
+/** Machined bunker corner radii: sharp industrial steel feel */
 object BunkerRadius {
-    val Card = 11.dp
-    val Sheet = 14.dp
-    val Control = 8.dp
-    val Badge = 6.dp
+    val Card = 6.dp
+    val Sheet = 8.dp
+    val Control = 4.dp
+    val Badge = 3.dp
 }
 
 @Composable
@@ -41,14 +41,14 @@ fun BunkerGrainOverlay(
     modifier: Modifier = Modifier
 ) {
     val grainBrush = remember(isDark) {
-        val size = 128
+        val size = 160
         val bmp = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
         val rng = Random(20261119)
         val pixels = IntArray(size * size)
-        val baseAlpha = if (isDark) 16 else 12
         for (i in pixels.indices) {
-            val v = rng.nextInt(256)
-            val a = (rng.nextInt(baseAlpha) + 4)
+            val bright = rng.nextBoolean()
+            val v = if (bright) 220 + rng.nextInt(36) else rng.nextInt(35)
+            val a = if (isDark) (14 + rng.nextInt(26)) else (10 + rng.nextInt(18))
             pixels[i] = android.graphics.Color.argb(a, v, v, v)
         }
         bmp.setPixels(pixels, 0, size, 0, 0, size, size)

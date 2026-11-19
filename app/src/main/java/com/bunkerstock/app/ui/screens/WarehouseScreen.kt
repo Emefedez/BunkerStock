@@ -61,6 +61,7 @@ import com.bunkerstock.app.ui.components.InventoryItemCard
 import com.bunkerstock.app.ui.components.KpiCard
 import com.bunkerstock.app.ui.components.WarehouseHealthBar
 import com.bunkerstock.app.ui.components.kpiIconFor
+import com.bunkerstock.app.ui.theme.BunkerRadius
 import com.bunkerstock.app.ui.theme.LocalAppStrings
 import com.bunkerstock.app.ui.theme.LocalBunkerColors
 
@@ -180,7 +181,7 @@ fun WarehouseScreen(
         // 4. Search, Category Chips, Status Chips & Sort
         item(span = { GridItemSpan(columns) }) {
             Surface(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(BunkerRadius.Card),
                 color = colors.cardSurface,
                 border = BorderStroke(1.dp, colors.borderSubtle),
                 modifier = Modifier.fillMaxWidth()
@@ -225,7 +226,7 @@ fun WarehouseScreen(
                                     }
                                 }
                             },
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(BunkerRadius.Control),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedContainerColor = colors.canvas,
                                 unfocusedContainerColor = colors.canvas,
@@ -237,7 +238,7 @@ fun WarehouseScreen(
                         Box {
                             OutlinedButton(
                                 onClick = { sortMenuExpanded = true },
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(BunkerRadius.Control),
                                 border = BorderStroke(1.dp, colors.borderSubtle),
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 14.dp)
                             ) {
@@ -369,7 +370,7 @@ fun WarehouseScreen(
         if (state.filteredItems.isEmpty()) {
             item(span = { GridItemSpan(columns) }) {
                 Surface(
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(BunkerRadius.Card),
                     color = colors.cardSurface,
                     border = BorderStroke(1.dp, colors.borderSubtle),
                     modifier = Modifier.fillMaxWidth()

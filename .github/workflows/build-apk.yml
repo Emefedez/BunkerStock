@@ -30,17 +30,29 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
+      - name: Decode persistent signing keystore
+        if: secrets.SIGNING_KEY_BASE64 != ''
+        env:
+          SIGNING_KEY_BASE64: ${{ secrets.SIGNING_KEY_BASE64 }}
+        run: |
+          echo "$SIGNING_KEY_BASE64" | base64 --decode > "${RUNNER_TEMP}/bunkerstock.jks"
+          echo "SIGNING_STORE_FILE=${RUNNER_TEMP}/bunkerstock.jks" >> "$GITHUB_ENV"
+
       - name: Run unit tests
         run: gradle testDebugUnitTest --stacktrace
 
-      - name: Assemble Debug APK
-        run: gradle assembleDebug --stacktrace
+      - name: Assemble Signed Release APK
+        env:
+          SIGNING_STORE_PASS: ${{ secrets.SIGNING_STORE_PASS }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASS: ${{ secrets.SIGNING_KEY_PASS }}
+        run: gradle assembleRelease --stacktrace
 
-      - name: Upload Debug APK artifact
+      - name: Upload Signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: BunkerStock-v2.5-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: BunkerStock-v2.6-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
           retention-days: 30
 
       - name: Publish GitHub Release on Tag
@@ -49,8 +61,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${GITHUB_REF_NAME}"
-          cp app/build/outputs/apk/debug/app-debug.apk "BunkerStock-${TAG}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "BunkerStock-${TAG}.apk"
           gh release create "$TAG" "BunkerStock-${TAG}.apk" \
             --title "BúnkerStock ${TAG}" \
-            --notes "Actualización automática de BúnkerStock ${TAG} (ML Kit QR/Barcode scanner, popup no bloqueante, puntuación nutricional/salud YsiFoods, extracción GS1/estimación de caducidad, estética búnker refinada y auto-updater)." \
+            --notes "BúnkerStock ${TAG}: firma persistente para actualizaciones automáticas sin desinstalar, estética búnker con textura granulada mate y esquinas tácticas mecanizadas, escáner ML Kit + popup inferior no bloqueante, puntuación nutricional YsiFoods y caducidad GS1/estimada." \
             || gh release upload "$TAG" "BunkerStock-${TAG}.apk" --clobber
