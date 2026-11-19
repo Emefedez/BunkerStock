@@ -33,7 +33,29 @@ data class InventoryItem(
     val location: String = "",
     val notes: String = "",
     val imageUri: String? = null,
-    val nutrition: ProductNutrition? = null
+    val nutrition: ProductNutrition? = null,
+    val updatedAt: Long = 0L,
+    val updatedBy: String = ""
+)
+
+@Serializable
+data class FamilyGroupConfig(
+    val roomId: String = "",
+    val secretKey: String = "",
+    val groupName: String = "",
+    val memberName: String = "",
+    val serverBaseUrl: String = "https://api.restful-api.dev/objects",
+    val lastSyncedAt: Long = 0L
+) {
+    val isJoined: Boolean get() = roomId.isNotBlank() && secretKey.isNotBlank()
+}
+
+@Serializable
+data class FamilySyncSnapshot(
+    val groupName: String = "",
+    val items: List<InventoryItem> = emptyList(),
+    val deletedIds: Map<String, Long> = emptyMap(),
+    val updatedAt: Long = 0L
 )
 
 enum class ItemCategory(val storageKey: String) {
@@ -136,7 +158,8 @@ data class AppSettings(
     val themeMode: AppThemeMode = AppThemeMode.DARK,
     val waterPersons: Int = 2,
     val waterLitersPerPersonDay: Int = 3,
-    val autoCheckUpdates: Boolean = true
+    val autoCheckUpdates: Boolean = true,
+    val expiryNotificationsEnabled: Boolean = true
 )
 
 data class ItemPrefill(

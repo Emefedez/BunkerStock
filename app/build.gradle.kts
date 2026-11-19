@@ -13,8 +13,8 @@ android {
         applicationId = "com.bunkerstock.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 29
-        versionName = "2.9"
+        versionCode = 30
+        versionName = "3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -86,6 +86,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("androidx.print:print:1.0.0")
 

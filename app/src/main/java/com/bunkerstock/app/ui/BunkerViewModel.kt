@@ -16,6 +16,9 @@ import com.bunkerstock.app.data.AppUpdateInfo
 import com.bunkerstock.app.data.BunkerRepository
 import com.bunkerstock.app.data.DashboardMetrics
 import com.bunkerstock.app.data.DetectedScanCandidate
+import com.bunkerstock.app.data.ExpiryNotificationHelper
+import com.bunkerstock.app.data.FamilyGroupConfig
+import com.bunkerstock.app.data.FamilySyncClient
 import com.bunkerstock.app.data.InventoryItem
 import com.bunkerstock.app.data.ItemPrefill
 import com.bunkerstock.app.data.OpenFoodFactsClient
@@ -30,6 +33,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -69,7 +73,10 @@ data class BunkerUiState(
     val qrLabelItemId: String? = null,
     val pendingConfirm: PendingConfirm? = null,
     val availableUpdate: AppUpdateInfo? = null,
-    val isDownloadingUpdate: Boolean = false
+    val isDownloadingUpdate: Boolean = false,
+    val familyGroup: FamilyGroupConfig = FamilyGroupConfig(),
+    val isSyncingFamily: Boolean = false,
+    val showFamilyDialog: Boolean = false
 ) {
     val hasActiveFilters: Boolean
         get() = searchQuery.isNotBlank() || selectedCategory != null || selectedStatus != StatusFilter.ALL
@@ -104,7 +111,9 @@ private data class ModalState(
     val qrLabelItemId: String? = null,
     val pendingConfirm: PendingConfirm? = null,
     val availableUpdate: AppUpdateInfo? = null,
-    val isDownloadingUpdate: Boolean = false
+    val isDownloadingUpdate: Boolean = false,
+    val isSyncingFamily: Boolean = false,
+    val showFamilyDialog: Boolean = false
 )
 
 class BunkerViewModel(application: Application) : AndroidViewModel(application) {
@@ -119,9 +128,10 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
     val uiState: StateFlow<BunkerUiState> = combine(
         repository.inventoryFlow,
         repository.settingsFlow,
+        repository.familyGroupFlow,
         filtersFlow,
         modalFlow
-    ) { inventory, settings, filters, modals ->
+    ) { inventory, settings, familyGroup, filters, modals ->
         val metrics = InventoryLogic.computeDashboardMetrics(
             items = inventory,
             persons = settings.waterPersons,
@@ -155,7 +165,10 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
             qrLabelItemId = modals.qrLabelItemId,
             pendingConfirm = modals.pendingConfirm,
             availableUpdate = modals.availableUpdate,
-            isDownloadingUpdate = modals.isDownloadingUpdate
+            isDownloadingUpdate = modals.isDownloadingUpdate,
+            familyGroup = familyGroup,
+            isSyncingFamily = modals.isSyncingFamily,
+            showFamilyDialog = modals.showFamilyDialog
         )
     }.stateIn(
         scope = viewModelScope,
@@ -166,7 +179,13 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
     init {
         viewModelScope.launch {
             repository.ensureInitialized()
-            val settings = uiState.value.settings
+            ExpiryNotificationHelper.schedulePeriodicCheck(getApplication())
+            ExpiryNotificationHelper.evaluateAndNotify(getApplication(), repository)
+            val family = repository.familyGroupFlow.first()
+            if (family.isJoined) {
+                syncFamilyNow(silent = true)
+            }
+            val settings = repository.settingsFlow.first()
             if (settings.autoCheckUpdates) {
                 checkForUpdates(silent = true)
             }
@@ -274,20 +293,27 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun saveItem(item: InventoryItem, isEdit: Boolean) {
         viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val stamped = item.copy(
+                updatedAt = now,
+                updatedBy = uiState.value.familyGroup.memberName
+            )
             val current = uiState.value.inventory.toMutableList()
             if (isEdit) {
-                val idx = current.indexOfFirst { it.id == item.id }
+                val idx = current.indexOfFirst { it.id == stamped.id }
                 if (idx >= 0) {
-                    current[idx] = item
+                    current[idx] = stamped
                 }
                 emitToast(strings().toastUpdated)
             } else {
-                current.add(0, item)
+                current.add(0, stamped)
                 emitToast(strings().toastAdded)
             }
             repository.saveInventory(current)
             filtersFlow.update { it.copy(bannerDismissed = false) }
             closeItemSheet()
+            ExpiryNotificationHelper.evaluateAndNotify(getApplication(), repository)
+            if (uiState.value.familyGroup.isJoined) syncFamilyNow(silent = true)
         }
     }
 
@@ -298,7 +324,11 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
             if (idx < 0) return@launch
             val existing = current[idx]
             val newQty = max(0.0, ((existing.qty + delta) * 100.0).roundToInt() / 100.0)
-            current[idx] = existing.copy(qty = newQty)
+            current[idx] = existing.copy(
+                qty = newQty,
+                updatedAt = System.currentTimeMillis(),
+                updatedBy = uiState.value.familyGroup.memberName
+            )
             repository.saveInventory(current)
             if (notifyQuickAdd) {
                 emitToast(
@@ -309,6 +339,7 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
                     )
                 )
             }
+            if (uiState.value.familyGroup.isJoined) syncFamilyNow(silent = true)
         }
     }
 
@@ -336,7 +367,11 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
                 is PendingConfirm.DeleteItem -> {
                     val updated = uiState.value.inventory.filterNot { it.id == action.item.id }
                     repository.saveInventory(updated)
+                    val deleted = repository.deletedIdsFlow.first().toMutableMap()
+                    deleted[action.item.id] = System.currentTimeMillis()
+                    repository.saveDeletedIds(deleted)
                     emitToast(strings().toastDeleted)
+                    if (uiState.value.familyGroup.isJoined) syncFamilyNow(silent = true)
                 }
                 PendingConfirm.RestoreDemo -> {
                     repository.saveInventory(InventoryLogic.getDefaultDemoData())
@@ -358,6 +393,12 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
         if (code.isEmpty()) return
 
         playBeepAndHaptic()
+
+        // Check if scanned QR is a Family Group invite link!
+        if (code.contains("bunkerstock://join", ignoreCase = true)) {
+            joinFamilyByInvite(code, uiState.value.familyGroup.memberName)
+            return
+        }
 
         val state = uiState.value
         val (gs1Expiry, gs1Batch) = InventoryLogic.extractGs1ExpiryAndBatch(code)
@@ -601,6 +642,96 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setAutoCheckUpdates(enabled: Boolean) {
         viewModelScope.launch { repository.updateAutoCheckUpdates(enabled) }
+    }
+
+    fun setExpiryNotifications(enabled: Boolean) {
+        viewModelScope.launch {
+            repository.updateExpiryNotifications(enabled)
+            if (enabled) {
+                ExpiryNotificationHelper.evaluateAndNotify(getApplication(), repository)
+            }
+        }
+    }
+
+    // Family Group Sync (E2E Encrypted, Zero-Auth)
+    fun openFamilyDialog() {
+        modalFlow.update { it.copy(showFamilyDialog = true) }
+    }
+
+    fun closeFamilyDialog() {
+        modalFlow.update { it.copy(showFamilyDialog = false) }
+    }
+
+    fun createFamilyGroup(groupName: String, memberName: String) {
+        viewModelScope.launch {
+            modalFlow.update { it.copy(isSyncingFamily = true) }
+            val localItems = repository.inventoryFlow.first()
+            val localDeleted = repository.deletedIdsFlow.first()
+            val result = FamilySyncClient.createGroup(groupName, memberName, localItems, localDeleted)
+            modalFlow.update { it.copy(isSyncingFamily = false) }
+            result.onSuccess { cfg ->
+                repository.saveFamilyGroup(cfg)
+                emitToast(strings().toastFamilyCreated(cfg.groupName))
+            }.onFailure {
+                emitToast(strings().toastFamilySyncError)
+            }
+        }
+    }
+
+    fun joinFamilyByInvite(rawInvite: String, memberName: String = "") {
+        val parsed = FamilySyncClient.parseInviteLink(rawInvite)
+        if (parsed == null) {
+            emitToast(strings().toastInviteInvalid)
+            return
+        }
+        val cfg = parsed.copy(memberName = memberName.trim())
+        viewModelScope.launch {
+            modalFlow.update { it.copy(isSyncingFamily = true) }
+            val localItems = repository.inventoryFlow.first()
+            val localDeleted = repository.deletedIdsFlow.first()
+            val result = FamilySyncClient.syncGroup(cfg, localItems, localDeleted, isInitialJoin = true)
+            modalFlow.update { it.copy(isSyncingFamily = false) }
+            result.onSuccess { (items, deleted, syncedCfg) ->
+                repository.saveInventory(items)
+                repository.saveDeletedIds(deleted)
+                repository.saveFamilyGroup(syncedCfg)
+                emitToast(strings().toastFamilyJoined(syncedCfg.groupName))
+                ExpiryNotificationHelper.evaluateAndNotify(getApplication(), repository)
+                selectTab(BunkerTab.WAREHOUSE)
+                closeFamilyDialog()
+            }.onFailure {
+                emitToast(strings().toastFamilySyncError)
+            }
+        }
+    }
+
+    fun syncFamilyNow(silent: Boolean = false) {
+        viewModelScope.launch {
+            val cfg = repository.familyGroupFlow.first()
+            if (!cfg.isJoined) return@launch
+            modalFlow.update { it.copy(isSyncingFamily = true) }
+            val localItems = repository.inventoryFlow.first()
+            val localDeleted = repository.deletedIdsFlow.first()
+            val result = FamilySyncClient.syncGroup(cfg, localItems, localDeleted)
+            modalFlow.update { it.copy(isSyncingFamily = false) }
+            result.onSuccess { (items, deleted, syncedCfg) ->
+                repository.saveInventory(items)
+                repository.saveDeletedIds(deleted)
+                repository.saveFamilyGroup(syncedCfg)
+                ExpiryNotificationHelper.evaluateAndNotify(getApplication(), repository)
+                if (!silent) emitToast(strings().toastFamilySynced)
+            }.onFailure {
+                if (!silent) emitToast(strings().toastFamilySyncError)
+            }
+        }
+    }
+
+    fun leaveFamilyGroup() {
+        viewModelScope.launch {
+            repository.clearFamilyGroup()
+            closeFamilyDialog()
+            emitToast(strings().toastFamilyLeft)
+        }
     }
 
     fun checkForUpdates(silent: Boolean = false) {

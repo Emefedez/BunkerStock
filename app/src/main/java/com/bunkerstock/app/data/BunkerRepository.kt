@@ -7,11 +7,13 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.bunkerstock.app.domain.InventoryLogic
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.encodeToString
 
 private val Context.bunkerDataStore: DataStore<Preferences> by preferencesDataStore(name = "bunkerstock_prefs")
 
@@ -19,11 +21,15 @@ class BunkerRepository(private val context: Context) {
 
     private object Keys {
         val INVENTORY_JSON = stringPreferencesKey("bunkerstock_inventory_v1")
+        val DELETED_IDS_JSON = stringPreferencesKey("bunkerstock_deleted_ids_v1")
+        val FAMILY_GROUP_JSON = stringPreferencesKey("bunkerstock_family_group_v1")
+        val NOTIFIED_EXPIRY_KEYS = stringSetPreferencesKey("notified_expiry_keys_v1")
         val LANGUAGE = stringPreferencesKey("app_language")
         val THEME_MODE = stringPreferencesKey("app_theme_mode")
         val WATER_PERSONS = intPreferencesKey("water_persons")
         val WATER_LITERS_PER_DAY = intPreferencesKey("water_liters_per_day")
         val AUTO_CHECK_UPDATES = booleanPreferencesKey("auto_check_updates")
+        val EXPIRY_NOTIFICATIONS = booleanPreferencesKey("expiry_notifications_enabled")
     }
 
     val inventoryFlow: Flow<List<InventoryItem>> = context.bunkerDataStore.data.map { prefs ->
@@ -35,13 +41,28 @@ class BunkerRepository(private val context: Context) {
         }
     }
 
+    val deletedIdsFlow: Flow<Map<String, Long>> = context.bunkerDataStore.data.map { prefs ->
+        val stored = prefs[Keys.DELETED_IDS_JSON] ?: return@map emptyMap()
+        runCatching { InventoryLogic.json.decodeFromString<Map<String, Long>>(stored) }.getOrDefault(emptyMap())
+    }
+
+    val familyGroupFlow: Flow<FamilyGroupConfig> = context.bunkerDataStore.data.map { prefs ->
+        val stored = prefs[Keys.FAMILY_GROUP_JSON] ?: return@map FamilyGroupConfig()
+        runCatching { InventoryLogic.json.decodeFromString<FamilyGroupConfig>(stored) }.getOrDefault(FamilyGroupConfig())
+    }
+
+    val notifiedExpiryKeysFlow: Flow<Set<String>> = context.bunkerDataStore.data.map { prefs ->
+        prefs[Keys.NOTIFIED_EXPIRY_KEYS] ?: emptySet()
+    }
+
     val settingsFlow: Flow<AppSettings> = context.bunkerDataStore.data.map { prefs ->
         AppSettings(
             language = AppLanguage.fromCode(prefs[Keys.LANGUAGE]),
             themeMode = AppThemeMode.fromCode(prefs[Keys.THEME_MODE]),
             waterPersons = (prefs[Keys.WATER_PERSONS] ?: 2).coerceIn(1, 20),
             waterLitersPerPersonDay = (prefs[Keys.WATER_LITERS_PER_DAY] ?: 3).coerceIn(1, 15),
-            autoCheckUpdates = prefs[Keys.AUTO_CHECK_UPDATES] ?: true
+            autoCheckUpdates = prefs[Keys.AUTO_CHECK_UPDATES] ?: true,
+            expiryNotificationsEnabled = prefs[Keys.EXPIRY_NOTIFICATIONS] ?: true
         )
     }
 
@@ -56,6 +77,32 @@ class BunkerRepository(private val context: Context) {
         val encoded = InventoryLogic.exportToJson(items)
         context.bunkerDataStore.edit { prefs ->
             prefs[Keys.INVENTORY_JSON] = encoded
+        }
+    }
+
+    suspend fun saveDeletedIds(deleted: Map<String, Long>) {
+        val encoded = InventoryLogic.json.encodeToString(deleted)
+        context.bunkerDataStore.edit { prefs ->
+            prefs[Keys.DELETED_IDS_JSON] = encoded
+        }
+    }
+
+    suspend fun saveFamilyGroup(config: FamilyGroupConfig) {
+        val encoded = InventoryLogic.json.encodeToString(config)
+        context.bunkerDataStore.edit { prefs ->
+            prefs[Keys.FAMILY_GROUP_JSON] = encoded
+        }
+    }
+
+    suspend fun clearFamilyGroup() {
+        context.bunkerDataStore.edit { prefs ->
+            prefs.remove(Keys.FAMILY_GROUP_JSON)
+        }
+    }
+
+    suspend fun saveNotifiedExpiryKeys(keys: Set<String>) {
+        context.bunkerDataStore.edit { prefs ->
+            prefs[Keys.NOTIFIED_EXPIRY_KEYS] = keys
         }
     }
 
@@ -81,6 +128,12 @@ class BunkerRepository(private val context: Context) {
     suspend fun updateAutoCheckUpdates(enabled: Boolean) {
         context.bunkerDataStore.edit { prefs ->
             prefs[Keys.AUTO_CHECK_UPDATES] = enabled
+        }
+    }
+
+    suspend fun updateExpiryNotifications(enabled: Boolean) {
+        context.bunkerDataStore.edit { prefs ->
+            prefs[Keys.EXPIRY_NOTIFICATIONS] = enabled
         }
     }
 }

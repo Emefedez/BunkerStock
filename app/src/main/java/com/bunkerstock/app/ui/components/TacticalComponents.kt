@@ -546,19 +546,23 @@ fun StatusBadge(
 fun ProductThumbnail(
     imageSource: String?,
     category: ItemCategory,
+    barcode: String = "",
+    productName: String = "",
     size: Dp = 52.dp,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val colors = LocalBunkerColors.current
     val (catIcon, catFg, catBg) = categoryStyle(category)
-    var bitmap by remember(imageSource) { mutableStateOf<Bitmap?>(null) }
+    var bitmap by remember(imageSource, barcode, productName) { mutableStateOf<Bitmap?>(null) }
 
-    LaunchedEffect(imageSource) {
-        bitmap = if (!imageSource.isNullOrBlank()) {
-            ProductImageStore.loadBitmap(context, imageSource)
-        } else {
-            null
+    LaunchedEffect(imageSource, barcode, productName) {
+        bitmap = when {
+            !imageSource.isNullOrBlank() -> ProductImageStore.loadBitmap(context, imageSource)
+                ?: ProductImageStore.resolveForProduct(context, barcode, productName)
+            barcode.isNotBlank() || productName.isNotBlank() ->
+                ProductImageStore.resolveForProduct(context, barcode, productName)
+            else -> null
         }
     }
 
@@ -679,6 +683,8 @@ fun InventoryItemCard(
                 ProductThumbnail(
                     imageSource = item.imageUri ?: item.nutrition?.imageUrl,
                     category = category,
+                    barcode = item.barcode,
+                    productName = item.name,
                     size = 54.dp
                 )
                 Column(

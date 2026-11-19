@@ -150,4 +150,42 @@ class InventoryLogicTest {
         assertTrue(com.bunkerstock.app.data.UpdateChecker.isNewerVersion("v2.6", "2.5"))
         assertTrue(!com.bunkerstock.app.data.UpdateChecker.isNewerVersion("v2.5", "2.5"))
     }
+
+    @Test
+    fun familySyncEncryptionInviteAndMergeWork() {
+        val secret = com.bunkerstock.app.data.FamilySyncClient.generateSecretKey()
+        val snap = com.bunkerstock.app.data.FamilySyncSnapshot(
+            groupName = "Casa",
+            items = listOf(
+                InventoryItem(id = "a", name = "Agua 5L", qty = 10.0, updatedAt = 200L),
+                InventoryItem(id = "b", name = "Atún", qty = 4.0, updatedAt = 100L)
+            ),
+            deletedIds = mapOf("old" to 150L),
+            updatedAt = 200L
+        )
+        val cipher = com.bunkerstock.app.data.FamilySyncClient.encryptSnapshot(snap, secret)
+        assertTrue(!cipher.contains("Agua"))
+        val decrypted = com.bunkerstock.app.data.FamilySyncClient.decryptSnapshot(cipher, secret)
+        assertNotNull(decrypted)
+        assertEquals("Casa", decrypted?.groupName)
+        assertEquals(2, decrypted?.items?.size)
+
+        val cfg = com.bunkerstock.app.data.FamilyGroupConfig(roomId = "room123", secretKey = secret, groupName = "Casa")
+        val link = com.bunkerstock.app.data.FamilySyncClient.buildInviteLink(cfg)
+        val parsed = com.bunkerstock.app.data.FamilySyncClient.parseInviteLink(link)
+        assertEquals("room123", parsed?.roomId)
+        assertEquals(secret, parsed?.secretKey)
+        assertEquals("Casa", parsed?.groupName)
+
+        // LWW merge keeps newer qty + preserves local custom photo + respects tombstone
+        val local = listOf(
+            InventoryItem(id = "a", name = "Agua 5L", qty = 6.0, imageUri = "/data/custom.jpg", updatedAt = 150L),
+            InventoryItem(id = "old", name = "Viejo", qty = 1.0, updatedAt = 100L)
+        )
+        val (merged, _) = com.bunkerstock.app.data.FamilySyncClient.mergeSnapshots(local, emptyMap(), snap)
+        assertEquals(2, merged.size)
+        val a = merged.first { it.id == "a" }
+        assertEquals(10.0, a.qty, 0.01)
+        assertEquals("/data/custom.jpg", a.imageUri)
+    }
 }

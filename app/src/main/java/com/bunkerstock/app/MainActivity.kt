@@ -1,5 +1,6 @@
 package com.bunkerstock.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -38,6 +39,7 @@ import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -83,10 +85,12 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bunkerstock.app.data.AppLanguage
 import com.bunkerstock.app.data.AppThemeMode
+import com.bunkerstock.app.data.ExpiryNotificationHelper
 import com.bunkerstock.app.ui.BunkerTab
 import com.bunkerstock.app.ui.BunkerViewModel
 import com.bunkerstock.app.ui.components.AppUpdateDialog
 import com.bunkerstock.app.ui.components.ConfirmActionDialog
+import com.bunkerstock.app.ui.components.FamilyGroupDialog
 import com.bunkerstock.app.ui.components.ItemEditorSheet
 import com.bunkerstock.app.ui.components.QrLabelDialog
 import com.bunkerstock.app.ui.components.QuickScanActionSheet
@@ -111,6 +115,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        handleIntent(intent)
 
         setContent {
             val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -153,6 +158,21 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
+        }
+    }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent == null) return
+        val data = intent.dataString
+        if (!data.isNullOrBlank() && data.startsWith("bunkerstock://join", ignoreCase = true)) {
+            viewModel.joinFamilyByInvite(data)
+        }
+        if (intent.getBooleanExtra(ExpiryNotificationHelper.EXTRA_OPEN_ALERTS, false)) {
+            viewModel.quickFilterAlerts()
         }
     }
 }
@@ -330,7 +350,7 @@ private fun BunkerStockApp(
                                     border = BorderStroke(1.dp, colors.borderSubtle)
                                 ) {
                                     Text(
-                                        text = "V2.9",
+                                        text = "V3.0",
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontFamily = FontFamily.Monospace,
                                             fontSize = 9.sp
@@ -348,6 +368,19 @@ private fun BunkerStockApp(
                         }
 
                         if (!state.scannerForForm && state.activeTab == BunkerTab.WAREHOUSE) {
+                            if (state.familyGroup.isJoined) {
+                                IconButton(
+                                    onClick = { viewModel.syncFamilyNow(silent = false) },
+                                    modifier = Modifier.size(44.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Sync,
+                                        contentDescription = strings.familySyncNow,
+                                        tint = colors.emerald,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
                             IconButton(
                                 onClick = {
                                     scannerUnlockCounter++
@@ -570,9 +603,14 @@ private fun BunkerStockApp(
                     state.activeTab == BunkerTab.SETTINGS -> {
                         SettingsScreen(
                             settings = state.settings,
+                            familyGroup = state.familyGroup,
+                            isSyncingFamily = state.isSyncingFamily,
+                            onOpenFamilyDialog = viewModel::openFamilyDialog,
+                            onSyncFamilyNow = { viewModel.syncFamilyNow(silent = false) },
                             onLanguageChange = viewModel::setLanguage,
                             onThemeModeChange = viewModel::setThemeMode,
                             onWaterConfigChange = viewModel::setWaterConfig,
+                            onExpiryNotifChange = viewModel::setExpiryNotifications,
                             onAutoUpdateChange = viewModel::setAutoCheckUpdates,
                             onCheckUpdatesNow = { viewModel.checkForUpdates(silent = false) },
                             onExportJson = ::triggerExportJson,
@@ -648,6 +686,24 @@ private fun BunkerStockApp(
             isDownloading = state.isDownloadingUpdate,
             onInstall = viewModel::downloadAndInstallUpdate,
             onDismiss = viewModel::dismissUpdateDialog
+        )
+    }
+
+    // Family Group Sync Dialog (QR + Shareable Link, AES-256 E2E)
+    if (state.showFamilyDialog) {
+        FamilyGroupDialog(
+            familyGroup = state.familyGroup,
+            isSyncing = state.isSyncingFamily,
+            onCreateGroup = viewModel::createFamilyGroup,
+            onJoinGroup = viewModel::joinFamilyByInvite,
+            onScanInviteQr = {
+                viewModel.closeFamilyDialog()
+                scannerUnlockCounter++
+                viewModel.selectTab(BunkerTab.SCANNER)
+            },
+            onSyncNow = { viewModel.syncFamilyNow(silent = false) },
+            onLeaveGroup = viewModel::leaveFamilyGroup,
+            onDismiss = viewModel::closeFamilyDialog
         )
     }
 }

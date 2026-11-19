@@ -1,5 +1,17 @@
 package com.bunkerstock.app.ui.screens
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.Sync
+import com.bunkerstock.app.data.FamilyGroupConfig
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -63,9 +75,14 @@ import com.bunkerstock.app.ui.theme.LocalBunkerColors
 @Composable
 fun SettingsScreen(
     settings: AppSettings,
+    familyGroup: FamilyGroupConfig,
+    isSyncingFamily: Boolean,
+    onOpenFamilyDialog: () -> Unit,
+    onSyncFamilyNow: () -> Unit,
     onLanguageChange: (AppLanguage) -> Unit,
     onThemeModeChange: (AppThemeMode) -> Unit,
     onWaterConfigChange: (Int, Int) -> Unit,
+    onExpiryNotifChange: (Boolean) -> Unit,
     onAutoUpdateChange: (Boolean) -> Unit,
     onCheckUpdatesNow: () -> Unit,
     onExportJson: () -> Unit,
@@ -77,6 +94,12 @@ fun SettingsScreen(
 ) {
     val strings = LocalAppStrings.current
     val colors = LocalBunkerColors.current
+
+    val notifPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        onExpiryNotifChange(granted)
+    }
 
     val segColors = SegmentedButtonDefaults.colors(
         activeContainerColor = colors.emeraldContainer,
@@ -98,6 +121,39 @@ fun SettingsScreen(
                 .widthIn(max = 640.dp)
                 .fillMaxWidth()
         ) {
+            // SECTION 0: FAMILY GROUP SYNC
+            SettingsSectionLabel(strings.settingsSectionFamily)
+            if (familyGroup.isJoined) {
+                val timeStr = if (familyGroup.lastSyncedAt > 0L) {
+                    SimpleDateFormat("HH:mm · dd/MM", Locale.getDefault()).format(Date(familyGroup.lastSyncedAt))
+                } else {
+                    "—"
+                }
+                SettingsActionRow(
+                    icon = Icons.Default.QrCode2,
+                    iconTint = colors.emerald,
+                    title = strings.familyConnectedTo(familyGroup.groupName),
+                    subtitle = "${strings.familyLastSync(timeStr)} · ${strings.familyInviteQrLink}",
+                    onClick = onOpenFamilyDialog
+                )
+                SettingsActionRow(
+                    icon = Icons.Default.Sync,
+                    iconTint = colors.amber,
+                    title = if (isSyncingFamily) "..." else strings.familySyncNow,
+                    subtitle = strings.familyE2eNote,
+                    onClick = onSyncFamilyNow
+                )
+            } else {
+                SettingsActionRow(
+                    icon = Icons.Default.Group,
+                    iconTint = colors.emerald,
+                    title = strings.familyCreateOrJoin,
+                    subtitle = strings.familyCreateOrJoinSub,
+                    onClick = onOpenFamilyDialog
+                )
+            }
+            HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.7f))
+
             // SECTION 1: GENERAL (flat editorial section, zero card box)
             SettingsSectionLabel(strings.settingsSectionGeneral)
             Column(
@@ -264,9 +320,36 @@ fun SettingsScreen(
             }
             HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.7f))
 
-            // SECTION 4: UPDATES, ABOUT & CREDITS
+            // SECTION 4: NOTIFICATIONS, UPDATES, ABOUT & CREDITS
             SettingsSectionLabel(strings.settingsSectionAbout)
             Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = colors.amber, modifier = Modifier.size(22.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(strings.settingsExpiryNotif, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            strings.settingsExpiryNotifSub,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.mutedText
+                        )
+                    }
+                    Switch(
+                        checked = settings.expiryNotificationsEnabled,
+                        onCheckedChange = { wantEnable ->
+                            if (wantEnable && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                onExpiryNotifChange(wantEnable)
+                            }
+                        }
+                    )
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

@@ -69,6 +69,13 @@ import androidx.compose.ui.window.Dialog
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.rememberCoroutineScope
+import android.content.Intent
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import com.bunkerstock.app.data.FamilyGroupConfig
+import com.bunkerstock.app.data.FamilySyncClient
 import com.bunkerstock.app.data.ProductImageStore
 import kotlinx.coroutines.launch
 import com.bunkerstock.app.data.AppUpdateInfo
@@ -902,4 +909,212 @@ fun AppUpdateDialog(
             }
         }
     )
+}
+
+@Composable
+fun FamilyGroupDialog(
+    familyGroup: FamilyGroupConfig,
+    isSyncing: Boolean,
+    onCreateGroup: (String, String) -> Unit,
+    onJoinGroup: (String, String) -> Unit,
+    onScanInviteQr: () -> Unit,
+    onSyncNow: () -> Unit,
+    onLeaveGroup: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val strings = LocalAppStrings.current
+    val colors = LocalBunkerColors.current
+
+    var groupName by remember { mutableStateOf(familyGroup.groupName.ifBlank { "Familia" }) }
+    var memberName by remember { mutableStateOf(familyGroup.memberName) }
+    var joinInput by remember { mutableStateOf("") }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(BunkerRadius.Sheet),
+            color = colors.cardSurface,
+            border = BorderStroke(1.dp, colors.borderSubtle),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.Group, contentDescription = null, tint = colors.emerald)
+                    Text(strings.familyDialogTitle, style = MaterialTheme.typography.titleLarge)
+                }
+
+                Text(
+                    text = strings.familyE2eNote,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.mutedText
+                )
+
+                if (familyGroup.isJoined) {
+                    val inviteLink = remember(familyGroup) { FamilySyncClient.buildInviteLink(familyGroup) }
+                    val qrBmp = remember(inviteLink) { QrCodeUtils.generateQrBitmap(inviteLink, 420) }
+
+                    Surface(
+                        shape = RoundedCornerShape(BunkerRadius.Card),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, colors.borderSubtle),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = familyGroup.groupName.uppercase(),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = Color(0xFF111312)
+                            )
+                            if (qrBmp != null) {
+                                Image(
+                                    bitmap = qrBmp.asImageBitmap(),
+                                    contentDescription = inviteLink,
+                                    modifier = Modifier.size(180.dp)
+                                )
+                            }
+                            Text(
+                                text = inviteLink.take(44) + "…",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF475569),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(
+                                        Intent.EXTRA_TEXT,
+                                        "Únete al inventario familiar \"${familyGroup.groupName}\" en BunkerStock:\n$inviteLink"
+                                    )
+                                }
+                                context.startActivity(Intent.createChooser(sendIntent, strings.familyShareLink))
+                            },
+                            shape = RoundedCornerShape(BunkerRadius.Control),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(strings.familyShareLink, fontWeight = FontWeight.Bold)
+                        }
+
+                        OutlinedButton(
+                            onClick = onSyncNow,
+                            enabled = !isSyncing,
+                            shape = RoundedCornerShape(BunkerRadius.Control)
+                        ) {
+                            if (isSyncing) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.Sync, contentDescription = strings.familySyncNow, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        TextButton(onClick = onLeaveGroup) {
+                            Text(strings.familyLeave, color = colors.danger)
+                        }
+                        TextButton(onClick = onDismiss) {
+                            Text(strings.close)
+                        }
+                    }
+                } else {
+                    // Create new family group
+                    OutlinedTextField(
+                        value = groupName,
+                        onValueChange = { groupName = it },
+                        label = { Text(strings.familyGroupNameLabel) },
+                        placeholder = { Text(strings.familyGroupNamePlaceholder) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = memberName,
+                        onValueChange = { memberName = it },
+                        label = { Text(strings.familyMemberNameLabel) },
+                        placeholder = { Text(strings.familyMemberNamePlaceholder) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Button(
+                        onClick = { onCreateGroup(groupName, memberName) },
+                        enabled = !isSyncing,
+                        shape = RoundedCornerShape(BunkerRadius.Control),
+                        modifier = Modifier.fillMaxWidth().height(46.dp)
+                    ) {
+                        if (isSyncing) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                        } else {
+                            Text(strings.familyCreateBtn, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.7f))
+
+                    // Join existing group via QR or Link
+                    Text(strings.familyJoinSection, style = MaterialTheme.typography.labelLarge)
+                    OutlinedTextField(
+                        value = joinInput,
+                        onValueChange = { joinInput = it },
+                        placeholder = { Text(strings.familyJoinPlaceholder) },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = onScanInviteQr,
+                            shape = RoundedCornerShape(BunkerRadius.Control),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(5.dp))
+                            Text(strings.familyScanInviteQr, maxLines = 1)
+                        }
+                        Button(
+                            onClick = { onJoinGroup(joinInput, memberName) },
+                            enabled = !isSyncing && joinInput.isNotBlank(),
+                            shape = RoundedCornerShape(BunkerRadius.Control),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(strings.familyJoinBtn, fontWeight = FontWeight.Bold, maxLines = 1)
+                        }
+                    }
+
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text(strings.close)
+                    }
+                }
+            }
+        }
+    }
 }
