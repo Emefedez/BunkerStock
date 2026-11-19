@@ -197,7 +197,7 @@ private fun ProductDetailCard(
     val colors = LocalBunkerColors.current
     val today = remember { LocalDate.now() }
     val isoFmt = remember { DateTimeFormatter.ISO_LOCAL_DATE }
-    val ddMmFmt = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
+    val ddMmFmt = remember { DateTimeFormatter.ofPattern("dd/MM/yy") }
 
     val category = ItemCategory.fromKey(item.category)
     val unit = ItemUnit.fromKey(item.unit)
@@ -498,10 +498,12 @@ private fun ProductDetailCard(
                     )
                 }
 
-                // Extra relevant nutritional details if present (kcal, flags, NOVA)
+                // Extra relevant nutritional details if present (kcal, flags — without duplicating Nutri-Score/Yuka)
                 item.nutrition?.let { nut ->
-                    if (nut.energyKcal != null || nut.safetyFlags.isNotEmpty() || nut.novaGroup != null) {
-                        NutritionBadgesRow(nutrition = nut)
+                    if (nut.energyKcal != null || nut.safetyFlags.isNotEmpty()) {
+                        NutritionBadgesRow(
+                            nutrition = nut.copy(nutriScoreGrade = null, healthScore = null)
+                        )
                     }
                 }
 
@@ -941,6 +943,7 @@ private fun ProductDetailCard(
                             if (activeDate != null) {
                                 ExpiryApproachBar(
                                     today = today,
+                                    todayLabel = strings.detailCalendarToday.uppercase(),
                                     expiryDate = activeDate,
                                     expiredDays = expiredDays,
                                     criticalDays = criticalDays,
@@ -1384,6 +1387,7 @@ private data class BatchCalendarMarker(
 @Composable
 private fun ExpiryApproachBar(
     today: LocalDate,
+    todayLabel: String,
     expiryDate: LocalDate,
     expiredDays: Int,
     criticalDays: Int,
@@ -1409,7 +1413,7 @@ private fun ExpiryApproachBar(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = "HOY",
+                text = todayLabel,
                 style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace, fontSize = 9.5.sp),
                 color = colors.emerald
             )

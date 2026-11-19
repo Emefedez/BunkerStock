@@ -166,7 +166,8 @@ object FamilySyncClient {
             connectTimeout = 10000
             readTimeout = 10000
             doOutput = true
-            setRequestProperty("Content-Type", "text/plain; charset=utf-8")
+            setRequestProperty("Content-Type", "text/plain")
+            setRequestProperty("Accept", "text/plain, */*")
             setRequestProperty("User-Agent", "BunkerStock-Android/3.1")
         }
         try {
