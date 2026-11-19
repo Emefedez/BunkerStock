@@ -12,13 +12,16 @@ import androidx.lifecycle.viewModelScope
 import com.bunkerstock.app.data.AppLanguage
 import com.bunkerstock.app.data.AppSettings
 import com.bunkerstock.app.data.AppThemeMode
+import com.bunkerstock.app.data.AppUpdateInfo
 import com.bunkerstock.app.data.BunkerRepository
 import com.bunkerstock.app.data.DashboardMetrics
+import com.bunkerstock.app.data.DetectedScanCandidate
 import com.bunkerstock.app.data.InventoryItem
 import com.bunkerstock.app.data.ItemPrefill
 import com.bunkerstock.app.data.OpenFoodFactsClient
 import com.bunkerstock.app.data.SortOption
 import com.bunkerstock.app.data.StatusFilter
+import com.bunkerstock.app.data.UpdateChecker
 import com.bunkerstock.app.domain.InventoryLogic
 import com.bunkerstock.app.ui.theme.stringsFor
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -61,15 +64,21 @@ data class BunkerUiState(
     val itemPrefill: ItemPrefill? = null,
     val scannerForForm: Boolean = false,
     val isLookingUpProduct: Boolean = false,
+    val detectedCandidate: DetectedScanCandidate? = null,
     val quickScanItemId: String? = null,
     val qrLabelItemId: String? = null,
-    val pendingConfirm: PendingConfirm? = null
+    val pendingConfirm: PendingConfirm? = null,
+    val availableUpdate: AppUpdateInfo? = null,
+    val isDownloadingUpdate: Boolean = false
 ) {
     val hasActiveFilters: Boolean
         get() = searchQuery.isNotBlank() || selectedCategory != null || selectedStatus != StatusFilter.ALL
 
     val quickScanItem: InventoryItem?
         get() = quickScanItemId?.let { id -> inventory.firstOrNull { it.id == id } }
+
+    val detectedExistingItem: InventoryItem?
+        get() = detectedCandidate?.existingItemId?.let { id -> inventory.firstOrNull { it.id == id } }
 
     val qrLabelItem: InventoryItem?
         get() = qrLabelItemId?.let { id -> inventory.firstOrNull { it.id == id } }
@@ -90,9 +99,12 @@ private data class ModalState(
     val itemPrefill: ItemPrefill? = null,
     val scannerForForm: Boolean = false,
     val isLookingUpProduct: Boolean = false,
+    val detectedCandidate: DetectedScanCandidate? = null,
     val quickScanItemId: String? = null,
     val qrLabelItemId: String? = null,
-    val pendingConfirm: PendingConfirm? = null
+    val pendingConfirm: PendingConfirm? = null,
+    val availableUpdate: AppUpdateInfo? = null,
+    val isDownloadingUpdate: Boolean = false
 )
 
 class BunkerViewModel(application: Application) : AndroidViewModel(application) {
@@ -138,9 +150,12 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
             itemPrefill = modals.itemPrefill,
             scannerForForm = modals.scannerForForm,
             isLookingUpProduct = modals.isLookingUpProduct,
+            detectedCandidate = modals.detectedCandidate,
             quickScanItemId = modals.quickScanItemId,
             qrLabelItemId = modals.qrLabelItemId,
-            pendingConfirm = modals.pendingConfirm
+            pendingConfirm = modals.pendingConfirm,
+            availableUpdate = modals.availableUpdate,
+            isDownloadingUpdate = modals.isDownloadingUpdate
         )
     }.stateIn(
         scope = viewModelScope,
@@ -151,6 +166,10 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
     init {
         viewModelScope.launch {
             repository.ensureInitialized()
+            val settings = uiState.value.settings
+            if (settings.autoCheckUpdates) {
+                checkForUpdates(silent = true)
+            }
         }
     }
 
@@ -333,7 +352,7 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    // Optical Scan Handling
+    // Optical Scan Handling (non-blocking bottom popup keeps camera live!)
     fun onCodeScanned(rawCode: String) {
         val code = rawCode.trim()
         if (code.isEmpty()) return
@@ -341,12 +360,37 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
         playBeepAndHaptic()
 
         val state = uiState.value
+        val (gs1Expiry, gs1Batch) = InventoryLogic.extractGs1ExpiryAndBatch(code)
+
         if (state.scannerForForm) {
             val structured = InventoryLogic.parseStructuredQr(code)
+            val prefill = structured?.copy(
+                expiryDate = structured.expiryDate ?: gs1Expiry,
+                notes = buildString {
+                    append(structured.notes)
+                    if (!gs1Batch.isNullOrBlank()) {
+                        if (isNotEmpty()) append(" · ")
+                        append("Lote: $gs1Batch")
+                    }
+                }
+            ) ?: (state.itemPrefill?.copy(
+                barcode = code,
+                expiryDate = gs1Expiry ?: state.itemPrefill.expiryDate
+            ) ?: ItemPrefill(
+                barcode = code,
+                expiryDate = gs1Expiry,
+                notes = buildString {
+                    if (gs1Expiry != null) append(strings().expiryGs1Note)
+                    if (!gs1Batch.isNullOrBlank()) {
+                        if (isNotEmpty()) append(" · ")
+                        append("Lote: $gs1Batch")
+                    }
+                }
+            ))
             modalFlow.update {
                 it.copy(
                     scannerForForm = false,
-                    itemPrefill = structured ?: (it.itemPrefill?.copy(barcode = code) ?: ItemPrefill(barcode = code))
+                    itemPrefill = prefill
                 )
             }
             emitToast(
@@ -356,42 +400,131 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
 
-        // Global scan: 1. Check existing inventory
+        // Global scan: DO NOT close camera — show non-blocking bottom popup!
         val existing = state.inventory.firstOrNull {
             it.barcode.isNotBlank() && it.barcode.equals(code, ignoreCase = true)
         }
         if (existing != null) {
-            modalFlow.update { it.copy(quickScanItemId = existing.id) }
-            return
-        }
-
-        // 2. Check structured QR
-        val structured = InventoryLogic.parseStructuredQr(code)
-        if (structured != null) {
-            emitToast(strings().toastStructuredQr)
-            openAddItem(structured)
-            return
-        }
-
-        // 3. Query Open Food Facts
-        viewModelScope.launch {
-            modalFlow.update { it.copy(isLookingUpProduct = true) }
-            val off = OpenFoodFactsClient.lookup(code)
-            modalFlow.update { it.copy(isLookingUpProduct = false) }
-            if (off != null) {
-                emitToast(strings().toastProductIdentified)
-                openAddItem(
-                    ItemPrefill(
-                        barcode = code,
-                        name = off.name,
-                        category = off.category,
-                        unit = off.unit
+            modalFlow.update {
+                it.copy(
+                    detectedCandidate = DetectedScanCandidate(
+                        code = code,
+                        existingItemId = existing.id,
+                        isLookingUp = false
                     )
                 )
-            } else {
-                emitToast(strings().toastNewCodeDetected(code))
-                openAddItem(ItemPrefill(barcode = code))
             }
+            return
+        }
+
+        val structured = InventoryLogic.parseStructuredQr(code)
+        if (structured != null) {
+            val withGs1 = structured.copy(
+                expiryDate = structured.expiryDate ?: gs1Expiry,
+                notes = buildString {
+                    append(structured.notes)
+                    if (!gs1Batch.isNullOrBlank()) {
+                        if (isNotEmpty()) append(" · ")
+                        append("Lote: $gs1Batch")
+                    }
+                }
+            )
+            modalFlow.update {
+                it.copy(
+                    detectedCandidate = DetectedScanCandidate(
+                        code = code,
+                        prefill = withGs1,
+                        isLookingUp = false
+                    )
+                )
+            }
+            return
+        }
+
+        // Show immediate bottom popup for new code while enriching via Open Food Facts
+        val initialPrefill = ItemPrefill(
+            barcode = code,
+            expiryDate = gs1Expiry,
+            notes = buildString {
+                if (gs1Expiry != null) append(strings().expiryGs1Note)
+                if (!gs1Batch.isNullOrBlank()) {
+                    if (isNotEmpty()) append(" · ")
+                    append("Lote: $gs1Batch")
+                }
+            }
+        )
+        modalFlow.update {
+            it.copy(
+                isLookingUpProduct = true,
+                detectedCandidate = DetectedScanCandidate(
+                    code = code,
+                    prefill = initialPrefill,
+                    isLookingUp = true
+                )
+            )
+        }
+
+        viewModelScope.launch {
+            val off = OpenFoodFactsClient.lookup(code)
+            modalFlow.update { current ->
+                // Only update popup if user hasn't dismissed or scanned another code
+                if (current.detectedCandidate?.code != code) {
+                    current.copy(isLookingUpProduct = false)
+                } else if (off != null) {
+                    val estDays = InventoryLogic.estimateShelfLifeDays(
+                        off.name,
+                        off.category,
+                        off.nutrition?.safetyFlags.orEmpty()
+                    )
+                    val resolvedExpiry = gs1Expiry ?: InventoryLogic.relativeDateString(estDays)
+                    val noteText = buildString {
+                        if (gs1Expiry != null) {
+                            append(strings().expiryGs1Note)
+                        } else {
+                            append(strings().expiryEstimatedNote(estDays))
+                        }
+                        if (!gs1Batch.isNullOrBlank()) append(" · Lote: $gs1Batch")
+                    }
+                    current.copy(
+                        isLookingUpProduct = false,
+                        detectedCandidate = DetectedScanCandidate(
+                            code = code,
+                            prefill = ItemPrefill(
+                                barcode = code,
+                                name = off.name,
+                                category = off.category,
+                                unit = off.unit,
+                                expiryDate = resolvedExpiry,
+                                notes = noteText,
+                                nutrition = off.nutrition
+                            ),
+                            isLookingUp = false
+                        )
+                    )
+                } else {
+                    current.copy(
+                        isLookingUpProduct = false,
+                        detectedCandidate = current.detectedCandidate.copy(isLookingUp = false)
+                    )
+                }
+            }
+        }
+    }
+
+    fun dismissDetectedCandidate() {
+        modalFlow.update { it.copy(detectedCandidate = null, isLookingUpProduct = false) }
+    }
+
+    fun confirmDetectedCandidate() {
+        val candidate = uiState.value.detectedCandidate ?: return
+        modalFlow.update { it.copy(detectedCandidate = null) }
+        val existing = candidate.existingItemId?.let { id ->
+            uiState.value.inventory.firstOrNull { it.id == id }
+        }
+        if (existing != null) {
+            openEditItem(existing)
+        } else {
+            openAddItem(candidate.prefill ?: ItemPrefill(barcode = candidate.code))
         }
     }
 
@@ -463,6 +596,40 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setWaterConfig(persons: Int, litersPerDay: Int) {
         viewModelScope.launch { repository.updateWaterConfig(persons, litersPerDay) }
+    }
+
+    fun setAutoCheckUpdates(enabled: Boolean) {
+        viewModelScope.launch { repository.updateAutoCheckUpdates(enabled) }
+    }
+
+    fun checkForUpdates(silent: Boolean = false) {
+        viewModelScope.launch {
+            val update = UpdateChecker.checkForUpdate()
+            if (update != null) {
+                modalFlow.update { it.copy(availableUpdate = update) }
+            } else if (!silent) {
+                emitToast(strings().updateUpToDate)
+            }
+        }
+    }
+
+    fun dismissUpdateDialog() {
+        modalFlow.update { it.copy(availableUpdate = null, isDownloadingUpdate = false) }
+    }
+
+    fun downloadAndInstallUpdate() {
+        val update = uiState.value.availableUpdate ?: return
+        viewModelScope.launch {
+            modalFlow.update { it.copy(isDownloadingUpdate = true) }
+            emitToast(strings().updateDownloading)
+            val ok = UpdateChecker.downloadAndInstallApk(getApplication(), update)
+            modalFlow.update { it.copy(isDownloadingUpdate = false) }
+            if (ok) {
+                dismissUpdateDialog()
+            } else {
+                emitToast(strings().updateFailed)
+            }
+        }
     }
 
     private fun playBeepAndHaptic() {

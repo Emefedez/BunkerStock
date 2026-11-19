@@ -1,6 +1,8 @@
 package com.bunkerstock.app.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -25,6 +27,7 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.TableView
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.WaterDrop
@@ -36,19 +39,24 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bunkerstock.app.data.AppLanguage
 import com.bunkerstock.app.data.AppSettings
 import com.bunkerstock.app.data.AppThemeMode
+import com.bunkerstock.app.ui.theme.BunkerRadius
 import com.bunkerstock.app.ui.theme.LocalAppStrings
 import com.bunkerstock.app.ui.theme.LocalBunkerColors
 
@@ -58,6 +66,8 @@ fun SettingsScreen(
     onLanguageChange: (AppLanguage) -> Unit,
     onThemeModeChange: (AppThemeMode) -> Unit,
     onWaterConfigChange: (Int, Int) -> Unit,
+    onAutoUpdateChange: (Boolean) -> Unit,
+    onCheckUpdatesNow: () -> Unit,
     onExportJson: () -> Unit,
     onExportCsv: () -> Unit,
     onImportJson: () -> Unit,
@@ -68,6 +78,15 @@ fun SettingsScreen(
     val strings = LocalAppStrings.current
     val colors = LocalBunkerColors.current
 
+    val segColors = SegmentedButtonDefaults.colors(
+        activeContainerColor = colors.emeraldContainer,
+        activeContentColor = colors.emerald,
+        activeBorderColor = colors.emerald.copy(alpha = 0.6f),
+        inactiveContainerColor = colors.canvas,
+        inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        inactiveBorderColor = colors.borderSubtle
+    )
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -76,21 +95,26 @@ fun SettingsScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Column(
-            modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier
+                .widthIn(max = 640.dp)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // SECTION 1: GENERAL (Language & Theme)
             SettingsSectionLabel(strings.settingsSectionGeneral)
             Surface(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(BunkerRadius.Card),
                 color = colors.cardSurface,
                 border = BorderStroke(1.dp, colors.borderSubtle),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     // Language Toggle (Español / English)
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
                             Icon(Icons.Default.Language, contentDescription = null, tint = colors.emerald)
                             Column {
                                 Text(strings.settingsLanguage, style = MaterialTheme.typography.titleMedium)
@@ -110,9 +134,20 @@ fun SettingsScreen(
                                 SegmentedButton(
                                     selected = settings.language == lang,
                                     onClick = { onLanguageChange(lang) },
-                                    shape = SegmentedButtonDefaults.itemShape(index = idx, count = langs.size)
+                                    shape = SegmentedButtonDefaults.itemShape(
+                                        index = idx,
+                                        count = langs.size,
+                                        baseShape = RoundedCornerShape(BunkerRadius.Control)
+                                    ),
+                                    colors = segColors,
+                                    icon = {}
                                 ) {
-                                    Text(label, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        text = label,
+                                        fontWeight = if (settings.language == lang) FontWeight.Bold else FontWeight.Medium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 }
                             }
                         }
@@ -121,8 +156,11 @@ fun SettingsScreen(
                     HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.6f))
 
                     // Theme selector
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
                             Icon(Icons.Default.Palette, contentDescription = null, tint = colors.amber)
                             Text(strings.settingsTheme, style = MaterialTheme.typography.titleMedium)
                         }
@@ -136,9 +174,20 @@ fun SettingsScreen(
                                 SegmentedButton(
                                     selected = settings.themeMode == mode,
                                     onClick = { onThemeModeChange(mode) },
-                                    shape = SegmentedButtonDefaults.itemShape(index = idx, count = themes.size)
+                                    shape = SegmentedButtonDefaults.itemShape(
+                                        index = idx,
+                                        count = themes.size,
+                                        baseShape = RoundedCornerShape(BunkerRadius.Control)
+                                    ),
+                                    colors = segColors,
+                                    icon = {}
                                 ) {
-                                    Text(label, maxLines = 1)
+                                    Text(
+                                        text = label,
+                                        fontWeight = if (settings.themeMode == mode) FontWeight.Bold else FontWeight.Medium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 }
                             }
                         }
@@ -149,7 +198,7 @@ fun SettingsScreen(
             // SECTION 2: WATER AUTONOMY
             SettingsSectionLabel(strings.settingsSectionAutonomy)
             Surface(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(BunkerRadius.Card),
                 color = colors.cardSurface,
                 border = BorderStroke(1.dp, colors.borderSubtle),
                 modifier = Modifier.fillMaxWidth()
@@ -187,7 +236,7 @@ fun SettingsScreen(
             // SECTION 3: DATA & BACKUPS
             SettingsSectionLabel(strings.settingsSectionData)
             Surface(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(BunkerRadius.Card),
                 color = colors.cardSurface,
                 border = BorderStroke(1.dp, colors.borderSubtle),
                 modifier = Modifier.fillMaxWidth()
@@ -236,25 +285,57 @@ fun SettingsScreen(
                 }
             }
 
-            // SECTION 4: ABOUT
+            // SECTION 4: UPDATES & ABOUT
             SettingsSectionLabel(strings.settingsSectionAbout)
             Surface(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(BunkerRadius.Card),
                 color = colors.cardSurface,
                 border = BorderStroke(1.dp, colors.borderSubtle),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Info, contentDescription = null, tint = colors.emerald)
-                    Text(
-                        text = strings.aboutDesc,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.mutedText
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = colors.emerald, modifier = Modifier.size(22.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(strings.settingsAutoUpdate, style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                strings.settingsAutoUpdateSub,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = colors.mutedText
+                            )
+                        }
+                        Switch(
+                            checked = settings.autoCheckUpdates,
+                            onCheckedChange = onAutoUpdateChange
+                        )
+                    }
+                    HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.6f))
+                    SettingsActionRow(
+                        icon = Icons.Default.Download,
+                        iconTint = colors.amber,
+                        title = strings.settingsCheckUpdatesNow,
+                        subtitle = strings.settingsCheckUpdatesSub,
+                        onClick = onCheckUpdatesNow
                     )
+                    HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.6f))
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Info, contentDescription = null, tint = colors.emerald)
+                        Text(
+                            text = strings.aboutDesc,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.mutedText
+                        )
+                    }
                 }
             }
 
@@ -283,6 +364,7 @@ private fun StepperSettingRow(
     onIncrement: () -> Unit
 ) {
     val strings = LocalAppStrings.current
+    val colors = LocalBunkerColors.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -291,22 +373,31 @@ private fun StepperSettingRow(
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 8.dp)
         ) {
             Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(20.dp))
             Text(label, style = MaterialTheme.typography.bodyLarge)
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onDecrement, modifier = Modifier.size(48.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(RoundedCornerShape(BunkerRadius.Control))
+                .background(colors.canvas)
+                .border(1.dp, colors.borderSubtle, RoundedCornerShape(BunkerRadius.Control))
+        ) {
+            IconButton(onClick = onDecrement, modifier = Modifier.size(44.dp)) {
                 Icon(Icons.Default.Remove, contentDescription = strings.subtractOne)
             }
             Text(
                 text = value.toString(),
                 style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace),
-                modifier = Modifier.width(30.dp)
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(34.dp)
             )
-            IconButton(onClick = onIncrement, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.Default.Add, contentDescription = strings.addOne, tint = LocalBunkerColors.current.emerald)
+            IconButton(onClick = onIncrement, modifier = Modifier.size(44.dp)) {
+                Icon(Icons.Default.Add, contentDescription = strings.addOne, tint = colors.emerald)
             }
         }
     }

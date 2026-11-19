@@ -66,6 +66,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.bunkerstock.app.data.AppUpdateInfo
 import com.bunkerstock.app.data.InventoryItem
 import com.bunkerstock.app.data.ItemCategory
 import com.bunkerstock.app.data.ItemPrefill
@@ -73,6 +74,7 @@ import com.bunkerstock.app.data.ItemUnit
 import com.bunkerstock.app.domain.InventoryLogic
 import com.bunkerstock.app.scanner.QrCodeUtils
 import com.bunkerstock.app.ui.PendingConfirm
+import com.bunkerstock.app.ui.theme.BunkerRadius
 import com.bunkerstock.app.ui.theme.LocalAppStrings
 import com.bunkerstock.app.ui.theme.LocalBunkerColors
 import java.time.Instant
@@ -130,6 +132,9 @@ fun ItemEditorSheet(
     var notes by remember(editingItem, prefill) {
         mutableStateOf(editingItem?.notes ?: prefill?.notes.orEmpty())
     }
+    var nutrition by remember(editingItem, prefill) {
+        mutableStateOf(editingItem?.nutrition ?: prefill?.nutrition)
+    }
 
     // Apply prefill updates if scanner returned while sheet is open
     LaunchedEffect(prefill) {
@@ -141,6 +146,7 @@ fun ItemEditorSheet(
             if (!prefill.expiryDate.isNullOrBlank()) expiryDate = prefill.expiryDate
             if (prefill.noExpiry != null) noExpiry = prefill.noExpiry
             if (prefill.notes.isNotBlank() && notes.isBlank()) notes = prefill.notes
+            if (prefill.nutrition != null) nutrition = prefill.nutrition
         }
     }
 
@@ -167,6 +173,10 @@ fun ItemEditorSheet(
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
+
+            nutrition?.let { nut ->
+                NutritionBadgesRow(nutrition = nut)
+            }
 
             // Name
             OutlinedTextField(
@@ -403,7 +413,8 @@ fun ItemEditorSheet(
                             noExpiry = noExpiry,
                             expiryDate = if (noExpiry) "" else expiryDate.trim(),
                             location = location.trim(),
-                            notes = notes.trim()
+                            notes = notes.trim(),
+                            nutrition = nutrition
                         )
                         onSave(item, isEdit)
                     },
@@ -797,6 +808,40 @@ fun ConfirmActionDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
+                Text(strings.cancel)
+            }
+        }
+    )
+}
+
+@Composable
+fun AppUpdateDialog(
+    update: AppUpdateInfo,
+    isDownloading: Boolean,
+    onInstall: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val strings = LocalAppStrings.current
+    AlertDialog(
+        onDismissRequest = { if (!isDownloading) onDismiss() },
+        title = { Text(strings.updateDialogTitle(update.versionName), fontWeight = FontWeight.Bold) },
+        text = {
+            Text(
+                if (isDownloading) strings.updateDownloading
+                else update.releaseNotes.ifBlank { strings.settingsCheckUpdatesSub }
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onInstall,
+                enabled = !isDownloading,
+                shape = RoundedCornerShape(BunkerRadius.Control)
+            ) {
+                Text(strings.updateInstallNow, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isDownloading) {
                 Text(strings.cancel)
             }
         }

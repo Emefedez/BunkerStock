@@ -41,8 +41,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -75,6 +77,7 @@ import com.bunkerstock.app.data.AppLanguage
 import com.bunkerstock.app.data.AppThemeMode
 import com.bunkerstock.app.ui.BunkerTab
 import com.bunkerstock.app.ui.BunkerViewModel
+import com.bunkerstock.app.ui.components.AppUpdateDialog
 import com.bunkerstock.app.ui.components.ConfirmActionDialog
 import com.bunkerstock.app.ui.components.ItemEditorSheet
 import com.bunkerstock.app.ui.components.QrLabelDialog
@@ -82,6 +85,8 @@ import com.bunkerstock.app.ui.components.QuickScanActionSheet
 import com.bunkerstock.app.ui.screens.ScannerScreen
 import com.bunkerstock.app.ui.screens.SettingsScreen
 import com.bunkerstock.app.ui.screens.WarehouseScreen
+import com.bunkerstock.app.ui.theme.BunkerGrainOverlay
+import com.bunkerstock.app.ui.theme.BunkerRadius
 import com.bunkerstock.app.ui.theme.BunkerStockTheme
 import com.bunkerstock.app.ui.theme.LocalAppStrings
 import com.bunkerstock.app.ui.theme.LocalBunkerColors
@@ -290,12 +295,12 @@ private fun BunkerStockApp(
                                 color = colors.emerald
                             )
                             Surface(
-                                shape = RoundedCornerShape(6.dp),
+                                shape = RoundedCornerShape(BunkerRadius.Badge),
                                 color = colors.cardElevated,
                                 border = BorderStroke(1.dp, colors.borderSubtle)
                             ) {
                                 Text(
-                                    text = "V2.4",
+                                    text = "V2.5",
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontFamily = FontFamily.Monospace,
                                         fontSize = 10.sp
@@ -390,7 +395,14 @@ private fun BunkerStockApp(
                                 viewModel.selectTab(tab)
                             },
                             icon = { Icon(icon, contentDescription = label) },
-                            label = { Text(label) }
+                            label = { Text(label) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = colors.emerald,
+                                selectedTextColor = colors.emerald,
+                                indicatorColor = colors.emeraldContainer,
+                                unselectedIconColor = colors.mutedText,
+                                unselectedTextColor = colors.mutedText
+                            )
                         )
                     }
                 }
@@ -400,6 +412,7 @@ private fun BunkerStockApp(
             if (!state.scannerForForm && state.activeTab == BunkerTab.WAREHOUSE) {
                 ExtendedFloatingActionButton(
                     onClick = { viewModel.openAddItem() },
+                    shape = RoundedCornerShape(BunkerRadius.Card),
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     icon = { Icon(Icons.Default.Add, contentDescription = null) },
@@ -424,7 +437,14 @@ private fun BunkerStockApp(
                                 viewModel.selectTab(tab)
                             },
                             icon = { Icon(icon, contentDescription = label) },
-                            label = { Text(label) }
+                            label = { Text(label) },
+                            colors = NavigationRailItemDefaults.colors(
+                                selectedIconColor = colors.emerald,
+                                selectedTextColor = colors.emerald,
+                                indicatorColor = colors.emeraldContainer,
+                                unselectedIconColor = colors.mutedText,
+                                unselectedTextColor = colors.mutedText
+                            )
                         )
                     }
                 }
@@ -436,12 +456,19 @@ private fun BunkerStockApp(
                     .fillMaxSize()
                     .background(colors.canvas)
             ) {
+                BunkerGrainOverlay(isDark = colors.isDark)
+
                 when {
                     state.scannerForForm || state.activeTab == BunkerTab.SCANNER -> {
                         ScannerScreen(
-                            isLookingUp = state.isLookingUpProduct,
+                            detectedCandidate = state.detectedCandidate,
+                            detectedExistingItem = state.detectedExistingItem,
                             unlockTrigger = scannerUnlockCounter,
-                            onCodeScanned = { code -> viewModel.onCodeScanned(code) }
+                            onCodeScanned = { code -> viewModel.onCodeScanned(code) },
+                            onDismissCandidate = viewModel::dismissDetectedCandidate,
+                            onConfirmCandidate = viewModel::confirmDetectedCandidate,
+                            onQuickAddExisting = { id, amt -> viewModel.adjustQuantity(id, amt, notifyQuickAdd = true) },
+                            onImageScanError = viewModel::notifyMessage
                         )
                     }
 
@@ -469,6 +496,8 @@ private fun BunkerStockApp(
                             onLanguageChange = viewModel::setLanguage,
                             onThemeModeChange = viewModel::setThemeMode,
                             onWaterConfigChange = viewModel::setWaterConfig,
+                            onAutoUpdateChange = viewModel::setAutoCheckUpdates,
+                            onCheckUpdatesNow = { viewModel.checkForUpdates(silent = false) },
                             onExportJson = ::triggerExportJson,
                             onExportCsv = ::triggerExportCsv,
                             onImportJson = ::triggerImportJson,
@@ -531,6 +560,17 @@ private fun BunkerStockApp(
             pending = confirm,
             onConfirm = viewModel::executePendingConfirm,
             onDismiss = viewModel::dismissConfirm
+        )
+    }
+
+    // Auto-Update Dialog (read-only GitHub Releases)
+    val update = state.availableUpdate
+    if (update != null) {
+        AppUpdateDialog(
+            update = update,
+            isDownloading = state.isDownloadingUpdate,
+            onInstall = viewModel::downloadAndInstallUpdate,
+            onDismiss = viewModel::dismissUpdateDialog
         )
     }
 }

@@ -1,6 +1,8 @@
 package com.bunkerstock.app.ui.theme
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -8,13 +10,55 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.ImageShader
+import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bunkerstock.app.data.AppThemeMode
+import kotlin.random.Random
+
+/** Machined bunker corner radii: crisper & more tactical than default bubbly Material corners */
+object BunkerRadius {
+    val Card = 11.dp
+    val Sheet = 14.dp
+    val Control = 8.dp
+    val Badge = 6.dp
+}
+
+@Composable
+fun BunkerGrainOverlay(
+    isDark: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val grainBrush = remember(isDark) {
+        val size = 128
+        val bmp = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+        val rng = Random(20261119)
+        val pixels = IntArray(size * size)
+        val baseAlpha = if (isDark) 16 else 12
+        for (i in pixels.indices) {
+            val v = rng.nextInt(256)
+            val a = (rng.nextInt(baseAlpha) + 4)
+            pixels[i] = android.graphics.Color.argb(a, v, v, v)
+        }
+        bmp.setPixels(pixels, 0, size, 0, 0, size, size)
+        val imageBitmap: ImageBitmap = bmp.asImageBitmap()
+        ShaderBrush(ImageShader(imageBitmap, TileMode.Repeated, TileMode.Repeated))
+    }
+    Canvas(modifier = modifier.fillMaxSize()) {
+        drawRect(brush = grainBrush)
+    }
+}
 
 // Core Bunker Palette
 val Slate950 = Color(0xFF090D16)

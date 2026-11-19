@@ -3,9 +3,13 @@ name: Build Android APK
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -35,6 +39,18 @@ jobs:
       - name: Upload Debug APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: BunkerStock-v2.4-debug-apk
+          name: BunkerStock-v2.5-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
+
+      - name: Publish GitHub Release on Tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          cp app/build/outputs/apk/debug/app-debug.apk "BunkerStock-${TAG}.apk"
+          gh release create "$TAG" "BunkerStock-${TAG}.apk" \
+            --title "BúnkerStock ${TAG}" \
+            --notes "Actualización automática de BúnkerStock ${TAG} (ML Kit QR/Barcode scanner, popup no bloqueante, puntuación nutricional/salud YsiFoods, extracción GS1/estimación de caducidad, estética búnker refinada y auto-updater)." \
+            || gh release upload "$TAG" "BunkerStock-${TAG}.apk" --clobber

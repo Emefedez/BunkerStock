@@ -13,8 +13,8 @@ android {
         applicationId = "com.bunkerstock.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 24
-        versionName = "2.4"
+        versionCode = 25
+        versionName = "2.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -80,7 +80,10 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$cameraVersion")
     implementation("androidx.camera:camera-view:$cameraVersion")
 
-    // ZXing Core for 100% offline barcode/QR decoding and QR label generation
+    // Bundled offline ML Kit Barcode Scanner (high-accuracy QR/EAN/UPC/Code128/DataMatrix)
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
+
+    // ZXing Core for offline QR label generation & fallback bitmap decoding
     implementation("com.google.zxing:core:3.5.3")
 
     testImplementation("junit:junit:4.13.2")

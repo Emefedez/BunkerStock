@@ -3,4 +3,7 @@
     <cache-path
         name="qr_labels"
         path="qr_labels/" />
+    <cache-path
+        name="apk_updates"
+        path="apk_updates/" />
 </paths>

@@ -3,6 +3,24 @@ package com.bunkerstock.app.data
 import kotlinx.serialization.Serializable
 
 @Serializable
+data class ProductNutrition(
+    val nutriScoreGrade: String? = null, // A..E
+    val novaGroup: Int? = null,          // 1..4
+    val healthScore: Int? = null,        // 0..100
+    val energyKcal: Double? = null,
+    val proteinGrams: Double? = null,
+    val carbsGrams: Double? = null,
+    val sugarsGrams: Double? = null,
+    val fatGrams: Double? = null,
+    val satFatGrams: Double? = null,
+    val fiberGrams: Double? = null,
+    val saltGrams: Double? = null,
+    val additivesCount: Int? = null,
+    val imageUrl: String? = null,
+    val safetyFlags: List<String> = emptyList() // HIGH_SUGAR, HIGH_SALT, HIGH_SAT_FAT, ULTRA_PROCESSED, HIGH_PROTEIN, HIGH_FIBER
+)
+
+@Serializable
 data class InventoryItem(
     val id: String,
     val barcode: String = "",
@@ -13,7 +31,8 @@ data class InventoryItem(
     val noExpiry: Boolean = false,
     val expiryDate: String = "", // yyyy-MM-dd
     val location: String = "",
-    val notes: String = ""
+    val notes: String = "",
+    val nutrition: ProductNutrition? = null
 )
 
 enum class ItemCategory(val storageKey: String) {
@@ -54,14 +73,14 @@ enum class ExpiryStatus {
 
 data class ExpiryInfo(
     val status: ExpiryStatus,
-    val daysLeft: Long, // Long.MAX_VALUE when NONE
+    val daysLeft: Long,
     val formattedDate: String,
     val isToday: Boolean = false
 )
 
 enum class StatusFilter {
     ALL,
-    ALERT_ALL, // EXPIRED + CRITICAL
+    ALERT_ALL,
     EXPIRED,
     CRITICAL,
     WARNING,
@@ -115,7 +134,8 @@ data class AppSettings(
     val language: AppLanguage = AppLanguage.ES,
     val themeMode: AppThemeMode = AppThemeMode.DARK,
     val waterPersons: Int = 2,
-    val waterLitersPerPersonDay: Int = 3
+    val waterLitersPerPersonDay: Int = 3,
+    val autoCheckUpdates: Boolean = true
 )
 
 data class ItemPrefill(
@@ -125,11 +145,27 @@ data class ItemPrefill(
     val unit: String? = null,
     val expiryDate: String? = null,
     val noExpiry: Boolean? = null,
-    val notes: String = ""
+    val notes: String = "",
+    val nutrition: ProductNutrition? = null
 )
 
 data class OpenFoodFactsResult(
     val name: String,
     val category: String,
-    val unit: String
+    val unit: String,
+    val nutrition: ProductNutrition? = null
+)
+
+data class DetectedScanCandidate(
+    val code: String,
+    val existingItemId: String? = null,
+    val prefill: ItemPrefill? = null,
+    val isLookingUp: Boolean = false
+)
+
+data class AppUpdateInfo(
+    val versionName: String,
+    val releaseNotes: String,
+    val apkDownloadUrl: String,
+    val htmlUrl: String
 )

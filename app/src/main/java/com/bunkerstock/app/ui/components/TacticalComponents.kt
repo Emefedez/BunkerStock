@@ -63,9 +63,13 @@ import com.bunkerstock.app.data.ExpiryStatus
 import com.bunkerstock.app.data.InventoryItem
 import com.bunkerstock.app.data.ItemCategory
 import com.bunkerstock.app.data.ItemUnit
+import com.bunkerstock.app.data.ProductNutrition
 import com.bunkerstock.app.domain.InventoryLogic
+import com.bunkerstock.app.ui.theme.BunkerRadius
 import com.bunkerstock.app.ui.theme.LocalAppStrings
 import com.bunkerstock.app.ui.theme.LocalBunkerColors
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 
 @Composable
 fun categoryStyle(category: ItemCategory): Triple<ImageVector, Color, Color> {
@@ -114,7 +118,7 @@ fun CriticalAlertBanner(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(BunkerRadius.Card),
         color = colors.dangerBannerBg,
         border = BorderStroke(1.dp, colors.danger.copy(alpha = 0.45f))
     ) {
@@ -192,9 +196,9 @@ fun KpiCard(
     val colors = LocalBunkerColors.current
     Surface(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(BunkerRadius.Card))
             .clickable(role = Role.Button, onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(BunkerRadius.Card),
         color = colors.cardSurface,
         border = BorderStroke(1.dp, colors.borderSubtle)
     ) {
@@ -284,7 +288,7 @@ fun WarehouseHealthBar(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(BunkerRadius.Card),
         color = colors.cardSurface,
         border = BorderStroke(1.dp, colors.borderSubtle)
     ) {
@@ -365,23 +369,28 @@ fun WarehouseHealthBar(
                 }
             }
 
-            // Compact legend
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                LegendDot(colors.emerald, strings.legendOptimal)
-                LegendDot(colors.warning, strings.legendWarning)
-                LegendDot(colors.amber, strings.legendCritical)
-                LegendDot(colors.danger, strings.legendExpired)
+            // 2x2 legend grid so labels never clip on narrow screens
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    LegendDot(colors.emerald, strings.legendOptimal, Modifier.weight(1f))
+                    LegendDot(colors.warning, strings.legendWarning, Modifier.weight(1f))
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    LegendDot(colors.amber, strings.legendCritical, Modifier.weight(1f))
+                    LegendDot(colors.danger, strings.legendExpired, Modifier.weight(1f))
+                }
             }
         }
     }
 }
 
 @Composable
-private fun LegendDot(color: Color, label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+private fun LegendDot(color: Color, label: String, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
         Box(
             modifier = Modifier
                 .size(7.dp)
@@ -390,10 +399,73 @@ private fun LegendDot(color: Color, label: String) {
         )
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 10.sp),
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 11.sp),
             color = LocalBunkerColors.current.mutedText,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun NutritionBadgesRow(
+    nutrition: ProductNutrition,
+    modifier: Modifier = Modifier
+) {
+    val strings = LocalAppStrings.current
+    val colors = LocalBunkerColors.current
+
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        nutrition.nutriScoreGrade?.let { grade ->
+            val (fg, bg) = when (grade.uppercase()) {
+                "A" -> colors.emerald to colors.emeraldContainer
+                "B" -> Color(0xFF84CC16) to colors.emeraldContainer
+                "C" -> colors.warning to colors.warningContainer
+                "D" -> colors.amber to colors.amberContainer
+                else -> colors.danger to colors.dangerContainer
+            }
+            SmallPill("Nutri-Score $grade", fg, bg)
+        }
+        nutrition.healthScore?.let { score ->
+            val (fg, bg) = when {
+                score >= 70 -> colors.emerald to colors.emeraldContainer
+                score >= 45 -> colors.amber to colors.amberContainer
+                else -> colors.danger to colors.dangerContainer
+            }
+            SmallPill(strings.healthScoreLabel(score), fg, bg)
+        }
+        nutrition.energyKcal?.let { kcal ->
+            SmallPill("${kcal.toInt()} kcal/100g", colors.cyan, colors.cyanContainer)
+        }
+        nutrition.safetyFlags.forEach { flag ->
+            val positive = flag == "HIGH_PROTEIN" || flag == "HIGH_FIBER"
+            SmallPill(
+                text = strings.safetyFlagLabel(flag),
+                fg = if (positive) colors.emerald else colors.danger,
+                bg = if (positive) colors.emeraldContainer else colors.dangerContainer
+            )
+        }
+    }
+}
+
+@Composable
+private fun SmallPill(text: String, fg: Color, bg: Color) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(BunkerRadius.Badge))
+            .background(bg)
+            .border(1.dp, fg.copy(alpha = 0.35f), RoundedCornerShape(BunkerRadius.Badge))
+            .padding(horizontal = 7.dp, vertical = 3.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+            color = fg
         )
     }
 }
@@ -464,7 +536,7 @@ fun InventoryItemCard(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(BunkerRadius.Card),
         color = cardBg,
         border = BorderStroke(1.dp, borderColor)
     ) {
@@ -561,6 +633,10 @@ fun InventoryItemCard(
                         style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
                         color = colors.mutedText
                     )
+                }
+                item.nutrition?.let { nut ->
+                    Spacer(Modifier.height(4.dp))
+                    NutritionBadgesRow(nutrition = nut)
                 }
             }
 

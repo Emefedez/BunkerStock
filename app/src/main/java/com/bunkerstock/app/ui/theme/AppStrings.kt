@@ -194,8 +194,41 @@ data class AppStrings(
     val toastQuickAdded: (String, String, String) -> String,
     val toastExportError: String,
     val toastQrShared: String,
-    val noExpiryCsv: String
+    val noExpiryCsv: String,
+    // v2.5: Non-blocking scan popup, image scan, nutrition/health, updates
+    val scanFromImage: String,
+    val scanImageNoCode: String,
+    val popupDetectedNew: String,
+    val popupOkRegister: String,
+    val popupOkOpen: String,
+    val healthScoreLabel: (Int) -> String,
+    val flagHighSugar: String,
+    val flagHighSalt: String,
+    val flagHighSatFat: String,
+    val flagUltraProcessed: String,
+    val flagHighProtein: String,
+    val flagHighFiber: String,
+    val expiryEstimatedNote: (Long) -> String,
+    val expiryGs1Note: String,
+    val settingsAutoUpdate: String,
+    val settingsAutoUpdateSub: String,
+    val settingsCheckUpdatesNow: String,
+    val settingsCheckUpdatesSub: String,
+    val updateDialogTitle: (String) -> String,
+    val updateInstallNow: String,
+    val updateDownloading: String,
+    val updateUpToDate: String,
+    val updateFailed: String
 ) {
+    fun safetyFlagLabel(flag: String): String = when (flag) {
+        "HIGH_SUGAR" -> flagHighSugar
+        "HIGH_SALT" -> flagHighSalt
+        "HIGH_SAT_FAT" -> flagHighSatFat
+        "ULTRA_PROCESSED" -> flagUltraProcessed
+        "HIGH_PROTEIN" -> flagHighProtein
+        "HIGH_FIBER" -> flagHighFiber
+        else -> flag
+    }
     fun categoryLabel(category: ItemCategory): String = when (language) {
         AppLanguage.ES -> when (category) {
             ItemCategory.FOOD -> "Alimentos"
@@ -433,8 +466,8 @@ val SpanishStrings = AppStrings(
     languageSpanish = "Español",
     languageEnglish = "English",
     settingsTheme = "Tema visual",
-    themeDark = "Oscuro Búnker",
-    themeLight = "Claro Táctico",
+    themeDark = "Oscuro",
+    themeLight = "Claro",
     themeSystem = "Sistema",
     settingsSectionAutonomy = "AUTONOMÍA HÍDRICA",
     settingsWaterPersons = "Personas en el búnker",
@@ -452,7 +485,7 @@ val SpanishStrings = AppStrings(
     clearAll = "Vaciar todo el almacén",
     clearAllSub = "Elimina permanentemente todos los registros",
     settingsSectionAbout = "ACERCA DE",
-    aboutDesc = "BúnkerStock v2.4 · Control logístico de inventario y caducidad diseñado para operación offline.",
+    aboutDesc = "BúnkerStock v2.5 · Control logístico de inventario, salud nutricional y caducidad diseñado para operación offline.",
     confirmDeleteTitle = "Eliminar Artículo",
     confirmDeleteMsg = { "¿Seguro que deseas eliminar \"$it\" del inventario?" },
     confirmDemoTitle = "Restaurar Datos de Ejemplo",
@@ -476,7 +509,30 @@ val SpanishStrings = AppStrings(
     toastQuickAdded = { amt, name, total -> "+$amt añadido a \"$name\" (Total: $total)" },
     toastExportError = "No se pudo completar la operación de archivo",
     toastQrShared = "Etiqueta QR lista para compartir",
-    noExpiryCsv = "No caduca"
+    noExpiryCsv = "No caduca",
+    scanFromImage = "Imagen QR",
+    scanImageNoCode = "No se detectó ningún código en la imagen",
+    popupDetectedNew = "PRODUCTO DETECTADO",
+    popupOkRegister = "OK · Registrar",
+    popupOkOpen = "OK · Editar",
+    healthScoreLabel = { "Salud $it/100" },
+    flagHighSugar = "Alto azúcar",
+    flagHighSalt = "Alta sal",
+    flagHighSatFat = "Grasa sat.",
+    flagUltraProcessed = "NOVA 4",
+    flagHighProtein = "Alta proteína",
+    flagHighFiber = "Alta fibra",
+    expiryEstimatedNote = { "Caducidad estimada (~$it d) — verifica el envase" },
+    expiryGs1Note = "Caducidad extraída del código GS1",
+    settingsAutoUpdate = "Actualizaciones automáticas",
+    settingsAutoUpdateSub = "Comprueba releases en GitHub (solo lectura, tus datos nunca salen del dispositivo)",
+    settingsCheckUpdatesNow = "Buscar actualizaciones",
+    settingsCheckUpdatesSub = "Comprueba si hay una nueva versión del APK",
+    updateDialogTitle = { "Actualización v$it disponible" },
+    updateInstallNow = "Descargar e instalar",
+    updateDownloading = "Descargando actualización...",
+    updateUpToDate = "BúnkerStock ya está actualizado",
+    updateFailed = "No se pudo comprobar/descargar la actualización"
 )
 
 val EnglishStrings = AppStrings(
@@ -602,8 +658,8 @@ val EnglishStrings = AppStrings(
     languageSpanish = "Español",
     languageEnglish = "English",
     settingsTheme = "Visual theme",
-    themeDark = "Bunker Dark",
-    themeLight = "Tactical Light",
+    themeDark = "Dark",
+    themeLight = "Light",
     themeSystem = "System",
     settingsSectionAutonomy = "WATER AUTONOMY",
     settingsWaterPersons = "People in bunker",
@@ -621,7 +677,7 @@ val EnglishStrings = AppStrings(
     clearAll = "Clear all inventory",
     clearAllSub = "Permanently deletes all records",
     settingsSectionAbout = "ABOUT",
-    aboutDesc = "BunkerStock v2.4 · Tactical logistics & expiry inventory control built for offline readiness.",
+    aboutDesc = "BunkerStock v2.5 · Tactical logistics, product health scoring & expiry control built for offline readiness.",
     confirmDeleteTitle = "Delete Item",
     confirmDeleteMsg = { "Are you sure you want to delete \"$it\" from inventory?" },
     confirmDemoTitle = "Restore Sample Data",
@@ -645,7 +701,30 @@ val EnglishStrings = AppStrings(
     toastQuickAdded = { amt, name, total -> "+$amt added to \"$name\" (Total: $total)" },
     toastExportError = "Could not complete file operation",
     toastQrShared = "QR label ready to share",
-    noExpiryCsv = "No expiry"
+    noExpiryCsv = "No expiry",
+    scanFromImage = "Image QR",
+    scanImageNoCode = "No QR or barcode found in image",
+    popupDetectedNew = "PRODUCT DETECTED",
+    popupOkRegister = "OK · Register",
+    popupOkOpen = "OK · Edit",
+    healthScoreLabel = { "Health $it/100" },
+    flagHighSugar = "High sugar",
+    flagHighSalt = "High salt",
+    flagHighSatFat = "High sat. fat",
+    flagUltraProcessed = "NOVA 4",
+    flagHighProtein = "High protein",
+    flagHighFiber = "High fiber",
+    expiryEstimatedNote = { "Estimated expiry (~$it d) — check package" },
+    expiryGs1Note = "Expiry extracted from GS1 code",
+    settingsAutoUpdate = "Automatic updates",
+    settingsAutoUpdateSub = "Read-only GitHub Releases check (your inventory data never leaves this device)",
+    settingsCheckUpdatesNow = "Check for updates",
+    settingsCheckUpdatesSub = "Check if a newer APK release is available",
+    updateDialogTitle = { "Update v$it available" },
+    updateInstallNow = "Download & install",
+    updateDownloading = "Downloading update...",
+    updateUpToDate = "BunkerStock is up to date",
+    updateFailed = "Could not check/download update"
 )
 
 fun stringsFor(language: AppLanguage): AppStrings = when (language) {

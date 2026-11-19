@@ -105,4 +105,49 @@ class InventoryLogicTest {
         assertEquals(3, alerts.size)
         assertEquals("item-3", alerts.first().id) // expired (-5d) first
     }
+
+    @Test
+    fun gs1ExpiryAndShelfLifeEstimationWork() {
+        val (exp, batch) = InventoryLogic.extractGs1ExpiryAndBatch("(01)08410076472199(17)270515(10)LOTE42B")
+        assertEquals("2027-05-15", exp)
+        assertEquals("LOTE42B", batch)
+
+        assertEquals(730L, InventoryLogic.estimateShelfLifeDays("Latas de Atún en Conserva", "Alimentos"))
+        assertEquals(365L, InventoryLogic.estimateShelfLifeDays("Agua Mineral 5L", "Agua"))
+        assertEquals(21L, InventoryLogic.estimateShelfLifeDays("Yogur Natural", "Alimentos"))
+    }
+
+    @Test
+    fun healthScoreAndUpdateVersionComparisonWork() {
+        val (goodScore, goodFlags) = com.bunkerstock.app.data.OpenFoodFactsClient.computeHealthScore(
+            nutriScoreGrade = "A",
+            novaGroup = 1,
+            sugars = 2.0,
+            satFat = 0.5,
+            salt = 0.2,
+            protein = 18.0,
+            fiber = 7.0,
+            additivesCount = 0
+        )
+        assertTrue(goodScore >= 90)
+        assertTrue(goodFlags.contains("HIGH_PROTEIN"))
+        assertTrue(goodFlags.contains("HIGH_FIBER"))
+
+        val (badScore, badFlags) = com.bunkerstock.app.data.OpenFoodFactsClient.computeHealthScore(
+            nutriScoreGrade = "E",
+            novaGroup = 4,
+            sugars = 32.0,
+            satFat = 9.0,
+            salt = 2.1,
+            protein = 2.0,
+            fiber = 0.5,
+            additivesCount = 8
+        )
+        assertTrue(badScore <= 25)
+        assertTrue(badFlags.contains("ULTRA_PROCESSED"))
+        assertTrue(badFlags.contains("HIGH_SUGAR"))
+
+        assertTrue(com.bunkerstock.app.data.UpdateChecker.isNewerVersion("v2.6", "2.5"))
+        assertTrue(!com.bunkerstock.app.data.UpdateChecker.isNewerVersion("v2.5", "2.5"))
+    }
 }

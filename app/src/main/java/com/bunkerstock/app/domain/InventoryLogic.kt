@@ -339,6 +339,76 @@ object InventoryLogic {
         return null
     }
 
+    /**
+     * Extracts expiry date (YYYY-MM-DD) and optional batch/lot from GS1-128 / GS1 DataMatrix
+     * Application Identifiers: (17)YYMMDD or 17YYMMDD, (10)BATCH, or explicit EXP/CAD patterns.
+     */
+    fun extractGs1ExpiryAndBatch(rawCode: String): Pair<String?, String?> {
+        val cleaned = rawCode.trim().replace("\u001D", " ")
+        var expiryIso: String? = null
+        var batch: String? = null
+
+        // Pattern 1: (17)YYMMDD or AI 17 after GTIN (01)14digits17YYMMDD
+        val gs1Paren = Regex("\\(17\\)(\\d{2})(\\d{2})(\\d{2})").find(cleaned)
+        val gs1Raw = if (gs1Paren == null) {
+            Regex("(?:^01\\d{14}|^\\x1d?)17(\\d{2})(\\d{2})(\\d{2})").find(cleaned)
+        } else null
+
+        val match = gs1Paren ?: gs1Raw
+        if (match != null) {
+            val yy = match.groupValues[1].toIntOrNull()
+            val mm = match.groupValues[2].toIntOrNull()
+            val dd = match.groupValues[3].toIntOrNull()
+            if (yy != null && mm != null && mm in 1..12 && dd != null) {
+                val year = 2000 + yy
+                val safeDay = if (dd == 0) {
+                    runCatching { LocalDate.of(year, mm, 1).lengthOfMonth() }.getOrDefault(28)
+                } else {
+                    dd.coerceIn(1, runCatching { LocalDate.of(year, mm, 1).lengthOfMonth() }.getOrDefault(28))
+                }
+                expiryIso = runCatching { LocalDate.of(year, mm, safeDay).format(isoFormatter) }.getOrNull()
+            }
+        }
+
+        // Pattern 2: Explicit ISO date inside QR/text
+        if (expiryIso == null) {
+            val iso = Regex("(?:EXP|CAD|BEST|VENC)[:=\\s-]*(\\d{4}-\\d{2}-\\d{2})", RegexOption.IGNORE_CASE).find(cleaned)
+            if (iso != null) expiryIso = iso.groupValues[1]
+        }
+
+        // Pattern 3: GS1 Batch/Lot (10)
+        val lotParen = Regex("\\(10\\)([A-Za-z0-9._-]{1,20})").find(cleaned)
+        if (lotParen != null) {
+            batch = lotParen.groupValues[1]
+        } else {
+            val lotExplicit = Regex("(?:LOT|LOTE|BATCH)[:=\\s-]*([A-Za-z0-9._-]{1,20})", RegexOption.IGNORE_CASE).find(cleaned)
+            if (lotExplicit != null) batch = lotExplicit.groupValues[1]
+        }
+
+        return expiryIso to batch
+    }
+
+    /**
+     * Estimates a realistic pantry shelf life in days from product name/category tags
+     * when a retail barcode (EAN-13) does not encode an expiration date.
+     */
+    fun estimateShelfLifeDays(name: String, category: String, nutritionFlags: List<String> = emptyList()): Long {
+        val text = "$name $category".lowercase()
+        return when {
+            Regex("conserva|lata|atún|atun|sardina|legumbre|lenteja|garbanzo|alubia|canned|tin").containsMatchIn(text) -> 730L
+            Regex("agua|water|potabiliz").containsMatchIn(text) -> 365L
+            Regex("arroz|pasta|harina|avena|cereal|macarr|espagueti|rice|flour|oats").containsMatchIn(text) -> 365L
+            Regex("leche|uht|milk").containsMatchIn(text) -> 150L
+            Regex("yogur|queso|lácteo|dairy|cheese|huevo|egg").containsMatchIn(text) -> 21L
+            Regex("carne|pollo|pescado|salmón|meat|fish|chicken").containsMatchIn(text) -> 5L
+            Regex("fruta|verdura|ensalada|fruit|vegetable").containsMatchIn(text) -> 10L
+            Regex("barrita|galleta|chocolate|miel|snack|biscuit").containsMatchIn(text) -> 180L
+            category.equals(ItemCategory.WATER.storageKey, ignoreCase = true) -> 365L
+            category.equals(ItemCategory.MATERIALS.storageKey, ignoreCase = true) -> 365L
+            else -> 180L
+        }
+    }
+
     fun exportToJson(items: List<InventoryItem>): String = json.encodeToString(items)
 
     fun importFromJson(raw: String): Result<List<InventoryItem>> = runCatching {
