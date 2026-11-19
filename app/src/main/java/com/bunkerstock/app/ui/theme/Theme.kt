@@ -46,9 +46,8 @@ fun BunkerGrainOverlay(
         val rng = Random(20261119)
         val pixels = IntArray(size * size)
         for (i in pixels.indices) {
-            val bright = rng.nextBoolean()
-            val v = if (bright) 220 + rng.nextInt(36) else rng.nextInt(35)
-            val a = if (isDark) (14 + rng.nextInt(26)) else (10 + rng.nextInt(18))
+            val v = if (isDark) (14 + rng.nextInt(26)) else (160 + rng.nextInt(45))
+            val a = if (isDark) (4 + rng.nextInt(9)) else (4 + rng.nextInt(7))
             pixels[i] = android.graphics.Color.argb(a, v, v, v)
         }
         bmp.setPixels(pixels, 0, size, 0, 0, size, size)

@@ -78,10 +78,12 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.bunkerstock.app.data.DetectedScanCandidate
 import com.bunkerstock.app.data.InventoryItem
+import com.bunkerstock.app.data.ItemCategory
 import com.bunkerstock.app.data.ItemUnit
 import com.bunkerstock.app.domain.InventoryLogic
 import com.bunkerstock.app.scanner.BarcodeAnalyzer
 import com.bunkerstock.app.ui.components.NutritionBadgesRow
+import com.bunkerstock.app.ui.components.ProductThumbnail
 import com.bunkerstock.app.ui.components.StatusBadge
 import com.bunkerstock.app.ui.theme.BunkerRadius
 import com.bunkerstock.app.ui.theme.LocalAppStrings
@@ -520,12 +522,20 @@ fun ScannerScreen(
                     modifier = Modifier.padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Header with X dismiss button
+                    // Header with Product Photo + X dismiss button
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        ProductThumbnail(
+                            imageSource = detectedExistingItem?.imageUri
+                                ?: detectedExistingItem?.nutrition?.imageUrl
+                                ?: candidate.prefill?.imageUri
+                                ?: candidate.prefill?.nutrition?.imageUrl,
+                            category = ItemCategory.fromKey(detectedExistingItem?.category ?: candidate.prefill?.category),
+                            size = 48.dp
+                        )
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = if (detectedExistingItem != null) strings.qsBadgeFound else strings.popupDetectedNew,

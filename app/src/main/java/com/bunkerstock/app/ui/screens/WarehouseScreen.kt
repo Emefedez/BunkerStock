@@ -90,11 +90,11 @@ fun WarehouseScreen(
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns),
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        contentPadding = PaddingValues(bottom = 96.dp),
+        horizontalArrangement = Arrangement.spacedBy(0.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
-        // 1. Critical Alert Banner
+        // 1. Critical Alert Banner (flat strip)
         if ((state.metrics.expiredCount > 0 || state.metrics.criticalCount > 0) && !state.bannerDismissed) {
             item(span = { GridItemSpan(columns) }) {
                 CriticalAlertBanner(
@@ -106,13 +106,14 @@ fun WarehouseScreen(
             }
         }
 
-        // 2. KPI Strip (horizontal scroll on compact, row on wide)
+        // 2. Military Telemetry Monitor Strip (KPI Cards)
         item(span = { GridItemSpan(columns) }) {
-            val kpiModifier = Modifier.width(if (isExpandedWidth) 176.dp else 156.dp)
+            val kpiModifier = Modifier.width(if (isExpandedWidth) 172.dp else 148.dp)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 KpiCard(
@@ -173,23 +174,23 @@ fun WarehouseScreen(
             }
         }
 
-        // 3. Warehouse Health Bar
+        // 3. Military Status Monitor Card (Health Bar)
         item(span = { GridItemSpan(columns) }) {
-            WarehouseHealthBar(metrics = state.metrics)
+            Column(modifier = Modifier.fillMaxWidth()) {
+                WarehouseHealthBar(metrics = state.metrics)
+                Spacer(Modifier.height(10.dp))
+                androidx.compose.material3.HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.7f))
+            }
         }
 
-        // 4. Search, Category Chips, Status Chips & Sort
+        // 4. Open Search, Category Chips, Status Chips & Sort (no card box)
         item(span = { GridItemSpan(columns) }) {
-            Surface(
-                shape = RoundedCornerShape(BunkerRadius.Card),
-                color = colors.cardSurface,
-                border = BorderStroke(1.dp, colors.borderSubtle),
-                modifier = Modifier.fillMaxWidth()
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
                     // Search + Sort
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -363,47 +364,40 @@ fun WarehouseScreen(
                         }
                     }
                 }
-            }
+                androidx.compose.material3.HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.7f))
         }
 
         // 5. Inventory Items or Empty State
         if (state.filteredItems.isEmpty()) {
             item(span = { GridItemSpan(columns) }) {
-                Surface(
-                    shape = RoundedCornerShape(BunkerRadius.Card),
-                    color = colors.cardSurface,
-                    border = BorderStroke(1.dp, colors.borderSubtle),
-                    modifier = Modifier.fillMaxWidth()
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Inventory2,
-                            contentDescription = null,
-                            tint = colors.mutedText,
-                            modifier = Modifier.size(44.dp)
-                        )
-                        Text(
-                            text = strings.emptyTitle,
-                            style = MaterialTheme.typography.titleMedium,
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
-                            text = strings.emptySubtitle,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.mutedText,
-                            textAlign = TextAlign.Center
-                        )
-                        if (state.hasActiveFilters) {
-                            Spacer(Modifier.height(4.dp))
-                            OutlinedButton(onClick = onResetFilters) {
-                                Text(strings.resetFilters)
-                            }
+                    Icon(
+                        imageVector = Icons.Default.Inventory2,
+                        contentDescription = null,
+                        tint = colors.mutedText,
+                        modifier = Modifier.size(44.dp)
+                    )
+                    Text(
+                        text = strings.emptyTitle,
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = strings.emptySubtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.mutedText,
+                        textAlign = TextAlign.Center
+                    )
+                    if (state.hasActiveFilters) {
+                        Spacer(Modifier.height(4.dp))
+                        OutlinedButton(onClick = onResetFilters) {
+                            Text(strings.resetFilters)
                         }
                     }
                 }

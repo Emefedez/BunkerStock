@@ -496,6 +496,7 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
                                 unit = off.unit,
                                 expiryDate = resolvedExpiry,
                                 notes = noteText,
+                                imageUri = off.nutrition?.imageUrl,
                                 nutrition = off.nutrition
                             ),
                             isLookingUp = false

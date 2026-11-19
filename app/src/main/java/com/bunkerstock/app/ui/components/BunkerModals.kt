@@ -66,6 +66,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.rememberCoroutineScope
+import com.bunkerstock.app.data.ProductImageStore
+import kotlinx.coroutines.launch
 import com.bunkerstock.app.data.AppUpdateInfo
 import com.bunkerstock.app.data.InventoryItem
 import com.bunkerstock.app.data.ItemCategory
@@ -132,8 +137,28 @@ fun ItemEditorSheet(
     var notes by remember(editingItem, prefill) {
         mutableStateOf(editingItem?.notes ?: prefill?.notes.orEmpty())
     }
+    var imageUri by remember(editingItem, prefill) {
+        mutableStateOf(editingItem?.imageUri ?: prefill?.imageUri ?: editingItem?.nutrition?.imageUrl ?: prefill?.nutrition?.imageUrl)
+    }
     var nutrition by remember(editingItem, prefill) {
         mutableStateOf(editingItem?.nutrition ?: prefill?.nutrition)
+    }
+
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val photoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val saved = ProductImageStore.saveCustomImage(
+                    context = context,
+                    uri = uri,
+                    itemId = editingItem?.id ?: "new"
+                )
+                if (saved != null) imageUri = saved
+            }
+        }
     }
 
     // Apply prefill updates if scanner returned while sheet is open
@@ -146,6 +171,7 @@ fun ItemEditorSheet(
             if (!prefill.expiryDate.isNullOrBlank()) expiryDate = prefill.expiryDate
             if (prefill.noExpiry != null) noExpiry = prefill.noExpiry
             if (prefill.notes.isNotBlank() && notes.isBlank()) notes = prefill.notes
+            if (prefill.imageUri != null) imageUri = prefill.imageUri
             if (prefill.nutrition != null) nutrition = prefill.nutrition
         }
     }
@@ -173,6 +199,35 @@ fun ItemEditorSheet(
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
+
+            // Product Photo Preview + Replace / Remove controls
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ProductThumbnail(
+                    imageSource = imageUri,
+                    category = category,
+                    size = 64.dp
+                )
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(strings.productPhotoLabel, style = MaterialTheme.typography.labelLarge)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { photoPicker.launch("image/*") },
+                            shape = RoundedCornerShape(BunkerRadius.Control)
+                        ) {
+                            Text(strings.replacePhoto)
+                        }
+                        if (!imageUri.isNullOrBlank()) {
+                            TextButton(onClick = { imageUri = null }) {
+                                Text(strings.removePhoto, color = colors.danger)
+                            }
+                        }
+                    }
+                }
+            }
 
             nutrition?.let { nut ->
                 NutritionBadgesRow(nutrition = nut)
@@ -414,6 +469,7 @@ fun ItemEditorSheet(
                             expiryDate = if (noExpiry) "" else expiryDate.trim(),
                             location = location.trim(),
                             notes = notes.trim(),
+                            imageUri = imageUri,
                             nutrition = nutrition
                         )
                         onSave(item, isEdit)

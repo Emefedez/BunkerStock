@@ -13,6 +13,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,10 +21,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -254,156 +260,215 @@ private fun BunkerStockApp(
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = colors.cardSurface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                ),
-                navigationIcon = {
-                    if (state.scannerForForm) {
-                        IconButton(onClick = { viewModel.closeFormScanner() }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = strings.cancel)
-                        }
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .padding(start = 12.dp, end = 6.dp)
-                                .size(38.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.ic_bunker_shield),
-                                contentDescription = null,
-                                modifier = Modifier.size(34.dp)
-                            )
-                        }
-                    }
-                },
-                title = {
-                    Column {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
-                        ) {
-                            Text(
-                                text = strings.brandBunker,
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold)
-                            )
-                            Text(
-                                text = strings.brandStock,
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
-                                color = colors.emerald
-                            )
-                            Surface(
-                                shape = RoundedCornerShape(BunkerRadius.Badge),
-                                color = colors.cardElevated,
-                                border = BorderStroke(1.dp, colors.borderSubtle)
+            // Compact 50dp tactical header bar
+            Surface(
+                color = colors.cardSurface,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.statusBarsPadding()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (state.scannerForForm) {
+                            IconButton(
+                                onClick = { viewModel.closeFormScanner() },
+                                modifier = Modifier.size(44.dp)
                             ) {
-                                Text(
-                                    text = "V2.7",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 10.sp
-                                    ),
-                                    color = colors.mutedText,
-                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                Icon(Icons.Default.ArrowBack, contentDescription = strings.cancel)
+                            }
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .padding(start = 6.dp, end = 8.dp)
+                                    .size(30.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_bunker_shield),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(28.dp)
                                 )
                             }
                         }
-                        Text(
-                            text = if (isExpandedWidth) "${strings.brandSubtitle} · $todayFormatted" else todayFormatted,
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                            color = colors.mutedText
-                        )
-                    }
-                },
-                actions = {
-                    if (!state.scannerForForm && state.activeTab == BunkerTab.WAREHOUSE) {
-                        IconButton(
-                            onClick = {
-                                scannerUnlockCounter++
-                                viewModel.selectTab(BunkerTab.SCANNER)
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Text(
+                                    text = strings.brandBunker,
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 15.sp
+                                    )
+                                )
+                                Text(
+                                    text = strings.brandStock,
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 15.sp
+                                    ),
+                                    color = colors.emerald
+                                )
+                                Surface(
+                                    shape = RoundedCornerShape(BunkerRadius.Badge),
+                                    color = colors.cardElevated,
+                                    border = BorderStroke(1.dp, colors.borderSubtle)
+                                ) {
+                                    Text(
+                                        text = "V2.8",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 9.sp
+                                        ),
+                                        color = colors.mutedText,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
                             }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.QrCodeScanner,
-                                contentDescription = strings.scanCode,
-                                tint = colors.amber
+                            Text(
+                                text = if (isExpandedWidth) "${strings.brandSubtitle} · $todayFormatted" else todayFormatted,
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp),
+                                color = colors.mutedText
                             )
                         }
 
-                        Box {
-                            IconButton(onClick = { dataMenuExpanded = true }) {
+                        if (!state.scannerForForm && state.activeTab == BunkerTab.WAREHOUSE) {
+                            IconButton(
+                                onClick = {
+                                    scannerUnlockCounter++
+                                    viewModel.selectTab(BunkerTab.SCANNER)
+                                },
+                                modifier = Modifier.size(44.dp)
+                            ) {
                                 Icon(
-                                    imageVector = Icons.Default.MoreVert,
-                                    contentDescription = strings.dataMenu
+                                    imageVector = Icons.Default.QrCodeScanner,
+                                    contentDescription = strings.scanCode,
+                                    tint = colors.amber,
+                                    modifier = Modifier.size(21.dp)
                                 )
                             }
-                            DropdownMenu(
-                                expanded = dataMenuExpanded,
-                                onDismissRequest = { dataMenuExpanded = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text(strings.exportJson) },
-                                    onClick = {
-                                        dataMenuExpanded = false
-                                        triggerExportJson()
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(strings.exportCsv) },
-                                    onClick = {
-                                        dataMenuExpanded = false
-                                        triggerExportCsv()
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(strings.importJson) },
-                                    onClick = {
-                                        dataMenuExpanded = false
-                                        triggerImportJson()
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(strings.restoreDemo) },
-                                    onClick = {
-                                        dataMenuExpanded = false
-                                        viewModel.requestRestoreDemo()
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(strings.clearAll, color = colors.danger) },
-                                    onClick = {
-                                        dataMenuExpanded = false
-                                        viewModel.requestClearAll()
-                                    }
-                                )
+
+                            Box {
+                                IconButton(
+                                    onClick = { dataMenuExpanded = true },
+                                    modifier = Modifier.size(44.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.MoreVert,
+                                        contentDescription = strings.dataMenu,
+                                        modifier = Modifier.size(21.dp)
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = dataMenuExpanded,
+                                    onDismissRequest = { dataMenuExpanded = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text(strings.exportJson) },
+                                        onClick = {
+                                            dataMenuExpanded = false
+                                            triggerExportJson()
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(strings.exportCsv) },
+                                        onClick = {
+                                            dataMenuExpanded = false
+                                            triggerExportCsv()
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(strings.importJson) },
+                                        onClick = {
+                                            dataMenuExpanded = false
+                                            triggerImportJson()
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(strings.restoreDemo) },
+                                        onClick = {
+                                            dataMenuExpanded = false
+                                            viewModel.requestRestoreDemo()
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(strings.clearAll, color = colors.danger) },
+                                        onClick = {
+                                            dataMenuExpanded = false
+                                            viewModel.requestClearAll()
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
+                    HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.7f))
                 }
-            )
+            }
         },
         bottomBar = {
             if (!isExpandedWidth && !state.scannerForForm) {
-                NavigationBar(containerColor = colors.cardSurface) {
-                    navItems.forEach { (tab, label, icon) ->
-                        NavigationBarItem(
-                            selected = state.activeTab == tab,
-                            onClick = {
-                                if (tab == BunkerTab.SCANNER) scannerUnlockCounter++
-                                viewModel.selectTab(tab)
-                            },
-                            icon = { Icon(icon, contentDescription = label) },
-                            label = { Text(label) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = colors.emerald,
-                                selectedTextColor = colors.emerald,
-                                indicatorColor = colors.emeraldContainer,
-                                unselectedIconColor = colors.mutedText,
-                                unselectedTextColor = colors.mutedText
-                            )
-                        )
+                // Compact 56dp tactical bottom bar
+                Surface(
+                    color = colors.cardSurface,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.navigationBarsPadding()) {
+                        HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.7f))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            navItems.forEach { (tab, label, icon) ->
+                                val selected = state.activeTab == tab
+                                val fg = if (selected) colors.emerald else colors.mutedText
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(56.dp)
+                                        .clickable {
+                                            if (tab == BunkerTab.SCANNER) scannerUnlockCounter++
+                                            viewModel.selectTab(tab)
+                                        },
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(
+                                                if (selected) colors.emeraldContainer else Color.Transparent,
+                                                RoundedCornerShape(BunkerRadius.Control)
+                                            )
+                                            .padding(horizontal = 14.dp, vertical = 3.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = label,
+                                            tint = fg,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 11.sp,
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                                        ),
+                                        color = fg
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -456,6 +521,9 @@ private fun BunkerStockApp(
                     .fillMaxSize()
                     .background(colors.canvas)
             ) {
+                // Subtle dark matte grain underneath all UI (never over text/controls)
+                BunkerGrainOverlay(isDark = colors.isDark)
+
                 when {
                     state.scannerForForm || state.activeTab == BunkerTab.SCANNER -> {
                         ScannerScreen(
@@ -504,9 +572,6 @@ private fun BunkerStockApp(
                         )
                     }
                 }
-
-                // Matte tactile grain overlay over canvas & cards (non-intercepting)
-                BunkerGrainOverlay(isDark = colors.isDark)
             }
         }
     }

@@ -32,6 +32,7 @@ data class InventoryItem(
     val expiryDate: String = "", // yyyy-MM-dd
     val location: String = "",
     val notes: String = "",
+    val imageUri: String? = null,
     val nutrition: ProductNutrition? = null
 )
 
@@ -146,6 +147,7 @@ data class ItemPrefill(
     val expiryDate: String? = null,
     val noExpiry: Boolean? = null,
     val notes: String = "",
+    val imageUri: String? = null,
     val nutrition: ProductNutrition? = null
 )
 

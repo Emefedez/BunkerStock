@@ -18,20 +18,28 @@
         android:strokeWidth="3.2"
         android:strokeLineJoin="round"
         android:pathData="M54,26 L75,34.5 V53 C75,66.2 66.2,76.8 54,82 C41.8,76.8 33,66.2 33,53 V34.5 Z" />
-    <!-- Left Geiger Phosphor Half-Shield Fill -->
+    <!-- Left Dark Phosphor Half-Shield -->
     <path
-        android:fillColor="#22C55E"
+        android:fillColor="#16291D"
         android:pathData="M54,30.5 L37,37.4 V52.8 C37,63.4 43.9,72.1 54,76.8 Z" />
     <!-- Right Gunmetal Steel Half -->
     <path
         android:fillColor="#222623"
         android:pathData="M54,30.5 L71,37.4 V52.8 C71,63.4 64.1,72.1 54,76.8 Z" />
-    <!-- Radiation Amber Check Emblem -->
+    <!-- Radiation Trefoil Center Dot (cx=54, cy=53) -->
     <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FACC15"
-        android:strokeWidth="2.8"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M45,54 L51.5,60.5 L64,47.5" />
+        android:fillColor="#FACC15"
+        android:pathData="M54,50 A3,3 0 1,1 53.99,50 Z" />
+    <!-- Radiation Trefoil Blade 1 (Top-Left, 150-210 deg -> upper-left wedge) -->
+    <path
+        android:fillColor="#FACC15"
+        android:pathData="M51.5,49 L46,40.2 A12,12 0 0,0 41.5,53 L49,53 A5,5 0 0,1 51.5,49 Z" />
+    <!-- Radiation Trefoil Blade 2 (Top-Right) -->
+    <path
+        android:fillColor="#FACC15"
+        android:pathData="M56.5,49 L62,40.2 A12,12 0 0,1 66.5,53 L59,53 A5,5 0 0,0 56.5,49 Z" />
+    <!-- Radiation Trefoil Blade 3 (Bottom) -->
+    <path
+        android:fillColor="#FACC15"
+        android:pathData="M51.5,57 L47,64.8 A12,12 0 0,0 61,64.8 L56.5,57 A5,5 0 0,1 51.5,57 Z" />
 </vector>

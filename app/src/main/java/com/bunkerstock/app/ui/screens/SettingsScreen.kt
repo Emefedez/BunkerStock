@@ -90,272 +90,241 @@ fun SettingsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Column(
             modifier = Modifier
                 .widthIn(max = 640.dp)
-                .fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .fillMaxWidth()
         ) {
-            // SECTION 1: GENERAL (Language & Theme)
+            // SECTION 1: GENERAL (flat editorial section, zero card box)
             SettingsSectionLabel(strings.settingsSectionGeneral)
-            Surface(
-                shape = RoundedCornerShape(BunkerRadius.Card),
-                color = colors.cardSurface,
-                border = BorderStroke(1.dp, colors.borderSubtle),
-                modifier = Modifier.fillMaxWidth()
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    // Language Toggle (Español / English)
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Icon(Icons.Default.Language, contentDescription = null, tint = colors.emerald)
-                            Column {
-                                Text(strings.settingsLanguage, style = MaterialTheme.typography.titleMedium)
-                                Text(
-                                    strings.settingsLanguageSub,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = colors.mutedText
-                                )
-                            }
-                        }
-                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                            val langs = listOf(
-                                AppLanguage.ES to strings.languageSpanish,
-                                AppLanguage.EN to strings.languageEnglish
-                            )
-                            langs.forEachIndexed { idx, (lang, label) ->
-                                SegmentedButton(
-                                    selected = settings.language == lang,
-                                    onClick = { onLanguageChange(lang) },
-                                    shape = SegmentedButtonDefaults.itemShape(
-                                        index = idx,
-                                        count = langs.size,
-                                        baseShape = RoundedCornerShape(BunkerRadius.Control)
-                                    ),
-                                    colors = segColors,
-                                    icon = {}
-                                ) {
-                                    Text(
-                                        text = label,
-                                        fontWeight = if (settings.language == lang) FontWeight.Bold else FontWeight.Medium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.6f))
-
-                    // Theme selector
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Icon(Icons.Default.Palette, contentDescription = null, tint = colors.amber)
-                            Text(strings.settingsTheme, style = MaterialTheme.typography.titleMedium)
-                        }
-                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                            val themes = listOf(
-                                AppThemeMode.DARK to strings.themeDark,
-                                AppThemeMode.LIGHT to strings.themeLight,
-                                AppThemeMode.SYSTEM to strings.themeSystem
-                            )
-                            themes.forEachIndexed { idx, (mode, label) ->
-                                SegmentedButton(
-                                    selected = settings.themeMode == mode,
-                                    onClick = { onThemeModeChange(mode) },
-                                    shape = SegmentedButtonDefaults.itemShape(
-                                        index = idx,
-                                        count = themes.size,
-                                        baseShape = RoundedCornerShape(BunkerRadius.Control)
-                                    ),
-                                    colors = segColors,
-                                    icon = {}
-                                ) {
-                                    Text(
-                                        text = label,
-                                        fontWeight = if (settings.themeMode == mode) FontWeight.Bold else FontWeight.Medium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // SECTION 2: WATER AUTONOMY
-            SettingsSectionLabel(strings.settingsSectionAutonomy)
-            Surface(
-                shape = RoundedCornerShape(BunkerRadius.Card),
-                color = colors.cardSurface,
-                border = BorderStroke(1.dp, colors.borderSubtle),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StepperSettingRow(
-                        icon = Icons.Default.WaterDrop,
-                        iconTint = colors.cyan,
-                        label = strings.settingsWaterPersons,
-                        value = settings.waterPersons,
-                        onDecrement = { onWaterConfigChange(settings.waterPersons - 1, settings.waterLitersPerPersonDay) },
-                        onIncrement = { onWaterConfigChange(settings.waterPersons + 1, settings.waterLitersPerPersonDay) }
-                    )
-                    HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.6f))
-                    StepperSettingRow(
-                        icon = Icons.Default.WaterDrop,
-                        iconTint = colors.cyan,
-                        label = strings.settingsWaterLiters,
-                        value = settings.waterLitersPerPersonDay,
-                        onDecrement = { onWaterConfigChange(settings.waterPersons, settings.waterLitersPerPersonDay - 1) },
-                        onIncrement = { onWaterConfigChange(settings.waterPersons, settings.waterLitersPerPersonDay + 1) }
-                    )
-                    Text(
-                        text = strings.settingsWaterFormula(
-                            settings.waterPersons,
-                            settings.waterLitersPerPersonDay,
-                            settings.waterPersons * settings.waterLitersPerPersonDay
-                        ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = colors.cyan
-                    )
-                }
-            }
-
-            // SECTION 3: DATA & BACKUPS
-            SettingsSectionLabel(strings.settingsSectionData)
-            Surface(
-                shape = RoundedCornerShape(BunkerRadius.Card),
-                color = colors.cardSurface,
-                border = BorderStroke(1.dp, colors.borderSubtle),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column {
-                    SettingsActionRow(
-                        icon = Icons.Default.Download,
-                        iconTint = colors.emerald,
-                        title = strings.exportJson,
-                        subtitle = strings.exportJsonSub,
-                        onClick = onExportJson
-                    )
-                    HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.6f))
-                    SettingsActionRow(
-                        icon = Icons.Default.TableView,
-                        iconTint = colors.cyan,
-                        title = strings.exportCsv,
-                        subtitle = strings.exportCsvSub,
-                        onClick = onExportCsv
-                    )
-                    HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.6f))
-                    SettingsActionRow(
-                        icon = Icons.Default.UploadFile,
-                        iconTint = colors.amber,
-                        title = strings.importJson,
-                        subtitle = strings.importJsonSub,
-                        onClick = onImportJson
-                    )
-                    HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.6f))
-                    SettingsActionRow(
-                        icon = Icons.Default.RestartAlt,
-                        iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        title = strings.restoreDemo,
-                        subtitle = strings.restoreDemoSub,
-                        onClick = onRestoreDemo
-                    )
-                    HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.6f))
-                    SettingsActionRow(
-                        icon = Icons.Default.DeleteForever,
-                        iconTint = colors.danger,
-                        title = strings.clearAll,
-                        subtitle = strings.clearAllSub,
-                        titleColor = colors.danger,
-                        onClick = onClearAll
-                    )
-                }
-            }
-
-            // SECTION 4: UPDATES & ABOUT
-            SettingsSectionLabel(strings.settingsSectionAbout)
-            Surface(
-                shape = RoundedCornerShape(BunkerRadius.Card),
-                color = colors.cardSurface,
-                border = BorderStroke(1.dp, colors.borderSubtle),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column {
+                // Language Toggle (Español / English)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = colors.emerald, modifier = Modifier.size(22.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(strings.settingsAutoUpdate, style = MaterialTheme.typography.titleMedium)
+                        Icon(Icons.Default.Language, contentDescription = null, tint = colors.emerald)
+                        Column {
+                            Text(strings.settingsLanguage, style = MaterialTheme.typography.titleMedium)
                             Text(
-                                strings.settingsAutoUpdateSub,
+                                strings.settingsLanguageSub,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = colors.mutedText
                             )
                         }
-                        Switch(
-                            checked = settings.autoCheckUpdates,
-                            onCheckedChange = onAutoUpdateChange
-                        )
                     }
-                    HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.6f))
-                    SettingsActionRow(
-                        icon = Icons.Default.Download,
-                        iconTint = colors.amber,
-                        title = strings.settingsCheckUpdatesNow,
-                        subtitle = strings.settingsCheckUpdatesSub,
-                        onClick = onCheckUpdatesNow
-                    )
-                    HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.6f))
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        val langs = listOf(
+                            AppLanguage.ES to strings.languageSpanish,
+                            AppLanguage.EN to strings.languageEnglish
+                        )
+                        langs.forEachIndexed { idx, (lang, label) ->
+                            SegmentedButton(
+                                selected = settings.language == lang,
+                                onClick = { onLanguageChange(lang) },
+                                shape = SegmentedButtonDefaults.itemShape(
+                                    index = idx,
+                                    count = langs.size,
+                                    baseShape = RoundedCornerShape(BunkerRadius.Control)
+                                ),
+                                colors = segColors,
+                                icon = {}
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontWeight = if (settings.language == lang) FontWeight.Bold else FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Theme selector
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(
-                        modifier = Modifier.padding(14.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Icon(Icons.Default.Info, contentDescription = null, tint = colors.emerald)
-                        Text(
-                            text = strings.aboutDesc,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.mutedText
-                        )
+                        Icon(Icons.Default.Palette, contentDescription = null, tint = colors.amber)
+                        Text(strings.settingsTheme, style = MaterialTheme.typography.titleMedium)
                     }
-                    HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.6f))
-                    Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = strings.creditsTitle,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = colors.amber
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        val themes = listOf(
+                            AppThemeMode.DARK to strings.themeDark,
+                            AppThemeMode.LIGHT to strings.themeLight,
+                            AppThemeMode.SYSTEM to strings.themeSystem
                         )
-                        Text(
-                            text = strings.creditsBody,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.mutedText
-                        )
+                        themes.forEachIndexed { idx, (mode, label) ->
+                            SegmentedButton(
+                                selected = settings.themeMode == mode,
+                                onClick = { onThemeModeChange(mode) },
+                                shape = SegmentedButtonDefaults.itemShape(
+                                    index = idx,
+                                    count = themes.size,
+                                    baseShape = RoundedCornerShape(BunkerRadius.Control)
+                                ),
+                                colors = segColors,
+                                icon = {}
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontWeight = if (settings.themeMode == mode) FontWeight.Bold else FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
                     }
                 }
             }
+            HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.7f))
 
-            Spacer(Modifier.height(24.dp))
+            // SECTION 2: WATER AUTONOMY
+            SettingsSectionLabel(strings.settingsSectionAutonomy)
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                StepperSettingRow(
+                    icon = Icons.Default.WaterDrop,
+                    iconTint = colors.cyan,
+                    label = strings.settingsWaterPersons,
+                    value = settings.waterPersons,
+                    onDecrement = { onWaterConfigChange(settings.waterPersons - 1, settings.waterLitersPerPersonDay) },
+                    onIncrement = { onWaterConfigChange(settings.waterPersons + 1, settings.waterLitersPerPersonDay) }
+                )
+                StepperSettingRow(
+                    icon = Icons.Default.WaterDrop,
+                    iconTint = colors.cyan,
+                    label = strings.settingsWaterLiters,
+                    value = settings.waterLitersPerPersonDay,
+                    onDecrement = { onWaterConfigChange(settings.waterPersons, settings.waterLitersPerPersonDay - 1) },
+                    onIncrement = { onWaterConfigChange(settings.waterPersons, settings.waterLitersPerPersonDay + 1) }
+                )
+                Text(
+                    text = strings.settingsWaterFormula(
+                        settings.waterPersons,
+                        settings.waterLitersPerPersonDay,
+                        settings.waterPersons * settings.waterLitersPerPersonDay
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.cyan
+                )
+            }
+            HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.7f))
+
+            // SECTION 3: DATA & BACKUPS
+            SettingsSectionLabel(strings.settingsSectionData)
+            Column {
+                SettingsActionRow(
+                    icon = Icons.Default.Download,
+                    iconTint = colors.emerald,
+                    title = strings.exportJson,
+                    subtitle = strings.exportJsonSub,
+                    onClick = onExportJson
+                )
+                SettingsActionRow(
+                    icon = Icons.Default.TableView,
+                    iconTint = colors.cyan,
+                    title = strings.exportCsv,
+                    subtitle = strings.exportCsvSub,
+                    onClick = onExportCsv
+                )
+                SettingsActionRow(
+                    icon = Icons.Default.UploadFile,
+                    iconTint = colors.amber,
+                    title = strings.importJson,
+                    subtitle = strings.importJsonSub,
+                    onClick = onImportJson
+                )
+                SettingsActionRow(
+                    icon = Icons.Default.RestartAlt,
+                    iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    title = strings.restoreDemo,
+                    subtitle = strings.restoreDemoSub,
+                    onClick = onRestoreDemo
+                )
+                SettingsActionRow(
+                    icon = Icons.Default.DeleteForever,
+                    iconTint = colors.danger,
+                    title = strings.clearAll,
+                    subtitle = strings.clearAllSub,
+                    titleColor = colors.danger,
+                    onClick = onClearAll
+                )
+            }
+            HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.7f))
+
+            // SECTION 4: UPDATES, ABOUT & CREDITS
+            SettingsSectionLabel(strings.settingsSectionAbout)
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = colors.emerald, modifier = Modifier.size(22.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(strings.settingsAutoUpdate, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            strings.settingsAutoUpdateSub,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.mutedText
+                        )
+                    }
+                    Switch(
+                        checked = settings.autoCheckUpdates,
+                        onCheckedChange = onAutoUpdateChange
+                    )
+                }
+                SettingsActionRow(
+                    icon = Icons.Default.Download,
+                    iconTint = colors.amber,
+                    title = strings.settingsCheckUpdatesNow,
+                    subtitle = strings.settingsCheckUpdatesSub,
+                    onClick = onCheckUpdatesNow
+                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Info, contentDescription = null, tint = colors.emerald)
+                    Text(
+                        text = strings.aboutDesc,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.mutedText
+                    )
+                }
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = strings.creditsTitle,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = colors.amber
+                    )
+                    Text(
+                        text = strings.creditsBody,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.mutedText
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(28.dp))
         }
     }
 }
@@ -366,7 +335,7 @@ private fun SettingsSectionLabel(text: String) {
         text = text,
         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
         color = LocalBunkerColors.current.mutedText,
-        modifier = Modifier.padding(start = 4.dp)
+        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp)
     )
 }
 
