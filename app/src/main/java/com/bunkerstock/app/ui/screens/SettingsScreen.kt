@@ -336,6 +336,22 @@ fun SettingsScreen(
                             color = colors.mutedText
                         )
                     }
+                    HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.6f))
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = strings.creditsTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = colors.amber
+                        )
+                        Text(
+                            text = strings.creditsBody,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.mutedText
+                        )
+                    }
                 }
             }
 

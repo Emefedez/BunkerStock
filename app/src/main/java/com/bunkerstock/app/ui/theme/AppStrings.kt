@@ -218,7 +218,9 @@ data class AppStrings(
     val updateInstallNow: String,
     val updateDownloading: String,
     val updateUpToDate: String,
-    val updateFailed: String
+    val updateFailed: String,
+    val creditsTitle: String,
+    val creditsBody: String
 ) {
     fun safetyFlagLabel(flag: String): String = when (flag) {
         "HIGH_SUGAR" -> flagHighSugar
@@ -485,7 +487,7 @@ val SpanishStrings = AppStrings(
     clearAll = "Vaciar todo el almacén",
     clearAllSub = "Elimina permanentemente todos los registros",
     settingsSectionAbout = "ACERCA DE",
-    aboutDesc = "BunkerStock v2.6 · Control logístico de inventario, salud nutricional y caducidad diseñado para operación offline.",
+    aboutDesc = "BunkerStock v2.7 · Control logístico de inventario, salud nutricional y caducidad diseñado para operación offline.",
     confirmDeleteTitle = "Eliminar Artículo",
     confirmDeleteMsg = { "¿Seguro que deseas eliminar \"$it\" del inventario?" },
     confirmDemoTitle = "Restaurar Datos de Ejemplo",
@@ -532,7 +534,9 @@ val SpanishStrings = AppStrings(
     updateInstallNow = "Descargar e instalar",
     updateDownloading = "Descargando actualización...",
     updateUpToDate = "BunkerStock ya está actualizado",
-    updateFailed = "No se pudo comprobar/descargar la actualización"
+    updateFailed = "No se pudo comprobar/descargar la actualización",
+    creditsTitle = "Créditos · by Emefedez",
+    creditsBody = "Gracias a Android / Jetpack Compose, Material 3, CameraX, Google ML Kit, ZXing, Open Food Facts, GitHub, android-design-skills y al equipo de Google DeepMind."
 )
 
 val EnglishStrings = AppStrings(
@@ -677,7 +681,7 @@ val EnglishStrings = AppStrings(
     clearAll = "Clear all inventory",
     clearAllSub = "Permanently deletes all records",
     settingsSectionAbout = "ABOUT",
-    aboutDesc = "BunkerStock v2.6 · Tactical logistics, product health scoring & expiry control built for offline readiness.",
+    aboutDesc = "BunkerStock v2.7 · Tactical logistics, product health scoring & expiry control built for offline readiness.",
     confirmDeleteTitle = "Delete Item",
     confirmDeleteMsg = { "Are you sure you want to delete \"$it\" from inventory?" },
     confirmDemoTitle = "Restore Sample Data",
@@ -724,7 +728,9 @@ val EnglishStrings = AppStrings(
     updateInstallNow = "Download & install",
     updateDownloading = "Downloading update...",
     updateUpToDate = "BunkerStock is up to date",
-    updateFailed = "Could not check/download update"
+    updateFailed = "Could not check/download update",
+    creditsTitle = "Credits · by Emefedez",
+    creditsBody = "Thanks to Android / Jetpack Compose, Material 3, CameraX, Google ML Kit, ZXing, Open Food Facts, GitHub, android-design-skills, and the Google DeepMind team."
 )
 
 fun stringsFor(language: AppLanguage): AppStrings = when (language) {

@@ -300,7 +300,7 @@ private fun BunkerStockApp(
                                 border = BorderStroke(1.dp, colors.borderSubtle)
                             ) {
                                 Text(
-                                    text = "V2.6",
+                                    text = "V2.7",
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontFamily = FontFamily.Monospace,
                                         fontSize = 10.sp
