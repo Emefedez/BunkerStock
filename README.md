@@ -67,7 +67,7 @@
 
 ## Download & Install
 
-Grab the latest signed release APK from **[GitHub Releases](https://github.com/Emefedez/bunker-stock-android/releases/latest)** (`BunkerStock-v3.2.apk`). All releases are signed with a persistent keystore so new versions install seamlessly in-place.
+Grab the latest signed release APK from **[GitHub Releases](https://github.com/Emefedez/bunker-stock-android/releases/latest)** (`BunkerStock-v3.3.apk`). All releases are signed with a persistent keystore so new versions install seamlessly in-place.
 
 ## Build & Test
 
