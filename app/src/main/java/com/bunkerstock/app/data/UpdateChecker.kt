@@ -2,6 +2,8 @@ package com.bunkerstock.app.data
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.bunkerstock.app.BuildConfig
 import com.bunkerstock.app.domain.InventoryLogic
@@ -96,6 +98,16 @@ object UpdateChecker {
                     FileOutputStream(apkFile).use { output ->
                         input.copyTo(output)
                     }
+                }
+                if (!context.packageManager.canRequestPackageInstalls()) {
+                    val permIntent = Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:${context.packageName}")
+                    ).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(permIntent)
+                    return@withContext true
                 }
                 val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apkFile)
                 val intent = Intent(Intent.ACTION_VIEW).apply {

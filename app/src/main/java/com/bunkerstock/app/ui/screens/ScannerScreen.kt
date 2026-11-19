@@ -30,11 +30,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.Check
@@ -42,12 +40,12 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.ImageSearch
-import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VideocamOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -165,7 +163,6 @@ fun ScannerScreen(
         boundCamera?.cameraControl?.enableTorch(torchEnabled)
     }
 
-    // Bind CameraX cleanly only when camera selection or permission changes (never on recomposition!)
     LaunchedEffect(previewViewRef, hasCameraPermission, useBackCamera) {
         val pv = previewViewRef ?: return@LaunchedEffect
         if (!hasCameraPermission) return@LaunchedEffect
@@ -210,449 +207,392 @@ fun ScannerScreen(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        Column(
+    // Zero-scroll layout: full viewfinder with overlaid compact controls + slim manual bar at bottom
+    Column(modifier = modifier.fillMaxSize()) {
+        Box(
             modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 180.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .weight(1f)
+                .fillMaxWidth()
+                .background(Color(0xFF0A0C0B))
         ) {
-            // Header Card
-            Surface(
-                shape = RoundedCornerShape(BunkerRadius.Card),
-                color = colors.cardSurface,
-                border = BorderStroke(1.dp, colors.borderSubtle),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Box(
+            when {
+                !hasCameraPermission -> {
+                    Column(
                         modifier = Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(BunkerRadius.Control))
-                            .background(colors.amberContainer),
-                        contentAlignment = Alignment.Center
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.QrCodeScanner,
+                            imageVector = Icons.Default.VideocamOff,
                             contentDescription = null,
-                            tint = colors.amber
-                        )
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = strings.scannerTitle,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text(
-                            text = strings.scannerFormats,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = colors.mutedText
-                        )
-                    }
-                    OutlinedButton(
-                        onClick = { imagePickerLauncher.launch("image/*") },
-                        shape = RoundedCornerShape(BunkerRadius.Control),
-                        border = BorderStroke(1.dp, colors.amber.copy(alpha = 0.5f))
-                    ) {
-                        Icon(
-                            Icons.Default.ImageSearch,
-                            contentDescription = strings.scanFromImage,
                             tint = colors.amber,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(38.dp)
                         )
-                        Spacer(Modifier.width(5.dp))
-                        Text(strings.scanFromImage, color = colors.amber)
-                    }
-                }
-            }
-
-            // Camera Controls
-            if (hasCameraPermission && !cameraError) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = {
-                            useBackCamera = !useBackCamera
-                            torchEnabled = false
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(BunkerRadius.Control),
-                        border = BorderStroke(1.dp, colors.borderSubtle)
-                    ) {
-                        Icon(Icons.Default.Cameraswitch, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(strings.scannerSwitchCamera)
-                    }
-
-                    if (hasFlashUnit) {
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            text = strings.scannerPermissionTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = strings.scannerPermissionDesc,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.mutedText,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(14.dp))
                         Button(
-                            onClick = { torchEnabled = !torchEnabled },
+                            onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (torchEnabled) colors.amber else colors.cardElevated,
-                                contentColor = if (torchEnabled) Color(0xFF090D16) else colors.amber
+                                containerColor = colors.amber,
+                                contentColor = Color(0xFF111312)
                             ),
                             shape = RoundedCornerShape(BunkerRadius.Control)
                         ) {
-                            Icon(
-                                imageVector = if (torchEnabled) Icons.Default.FlashOn else Icons.Default.FlashOff,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(strings.scannerTorch)
+                            Text(strings.scannerGrantPermission, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
-            }
 
-            // Camera Preview / Permission State
-            Surface(
-                shape = RoundedCornerShape(BunkerRadius.Card),
-                color = Color(0xFF020617),
-                border = BorderStroke(1.dp, colors.borderSubtle),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(300.dp)
-            ) {
-                when {
-                    !hasCameraPermission -> {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.VideocamOff,
-                                contentDescription = null,
-                                tint = colors.amber,
-                                modifier = Modifier.size(40.dp)
-                            )
-                            Spacer(Modifier.height(10.dp))
-                            Text(
-                                text = strings.scannerPermissionTitle,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = Color.White,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            Text(
-                                text = strings.scannerPermissionDesc,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color(0xFF94A3B8),
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(Modifier.height(14.dp))
-                            Button(
-                                onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = colors.amber,
-                                    contentColor = Color(0xFF090D16)
-                                ),
-                                shape = RoundedCornerShape(BunkerRadius.Control)
-                            ) {
-                                Text(strings.scannerGrantPermission, fontWeight = FontWeight.Bold)
-                            }
-                        }
+                cameraError -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = strings.scannerCameraUnavailable,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.mutedText,
+                            textAlign = TextAlign.Center
+                        )
                     }
+                }
 
-                    cameraError -> {
+                else -> {
+                    AndroidView(
+                        modifier = Modifier.fillMaxSize(),
+                        factory = { ctx ->
+                            PreviewView(ctx).apply {
+                                scaleType = PreviewView.ScaleType.FILL_CENTER
+                            }.also { previewViewRef = it }
+                        }
+                    )
+
+                    // Tactical Viewfinder Frame
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
                         Box(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(24.dp),
+                                .width(240.dp)
+                                .height(150.dp)
+                                .border(2.dp, colors.amber.copy(alpha = 0.85f), RoundedCornerShape(BunkerRadius.Card)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = strings.scannerCameraUnavailable,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color(0xFF94A3B8),
-                                textAlign = TextAlign.Center
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp)
+                                    .height(2.dp)
+                                    .background(Color(0xCCEF4444))
                             )
                         }
-                    }
-
-                    else -> {
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            AndroidView(
-                                modifier = Modifier.fillMaxSize(),
-                                factory = { ctx ->
-                                    PreviewView(ctx).apply {
-                                        scaleType = PreviewView.ScaleType.FILL_CENTER
-                                    }.also { previewViewRef = it }
-                                }
+                        Spacer(Modifier.height(10.dp))
+                        Surface(
+                            shape = RoundedCornerShape(BunkerRadius.Badge),
+                            color = Color(0xCC111312),
+                            border = BorderStroke(1.dp, colors.amber.copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = strings.scannerGuideHint,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = colors.amber,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                             )
-
-                            // Tactical Viewfinder Overlay
-                            Column(
-                                modifier = Modifier.fillMaxSize(),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .width(236.dp)
-                                        .height(140.dp)
-                                        .border(2.dp, colors.amber.copy(alpha = 0.85f), RoundedCornerShape(10.dp)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 10.dp)
-                                            .height(2.dp)
-                                            .background(Color(0xCCEF4444))
-                                    )
-                                }
-                                Spacer(Modifier.height(10.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(BunkerRadius.Badge),
-                                    color = Color(0xCC090D16),
-                                    border = BorderStroke(1.dp, colors.amber.copy(alpha = 0.4f))
-                                ) {
-                                    Text(
-                                        text = strings.scannerGuideHint,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = colors.amber,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
                         }
                     }
                 }
             }
 
-            // Manual Barcode Entry Fallback
-            Surface(
-                shape = RoundedCornerShape(BunkerRadius.Card),
-                color = colors.cardSurface,
-                border = BorderStroke(1.dp, colors.borderSubtle),
-                modifier = Modifier.fillMaxWidth()
+            // Compact Overlaid Controls inside the viewfinder (top-right): Image QR, Switch Camera, Torch
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = strings.scannerManualLabel,
-                        style = MaterialTheme.typography.labelLarge
+                ViewfinderIconButton(
+                    icon = Icons.Default.ImageSearch,
+                    contentDescription = strings.scanFromImage,
+                    tint = colors.amber,
+                    active = false,
+                    onClick = { imagePickerLauncher.launch("image/*") }
+                )
+                if (hasCameraPermission && !cameraError) {
+                    ViewfinderIconButton(
+                        icon = Icons.Default.Cameraswitch,
+                        contentDescription = strings.scannerSwitchCamera,
+                        tint = Color.White,
+                        active = false,
+                        onClick = {
+                            useBackCamera = !useBackCamera
+                            torchEnabled = false
+                        }
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    if (hasFlashUnit) {
+                        ViewfinderIconButton(
+                            icon = if (torchEnabled) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                            contentDescription = strings.scannerTorch,
+                            tint = if (torchEnabled) Color(0xFF111312) else colors.amber,
+                            active = torchEnabled,
+                            activeBg = colors.amber,
+                            onClick = { torchEnabled = !torchEnabled }
+                        )
+                    }
+                }
+            }
+
+            // Non-blocking Bottom Detection Popup over viewfinder (camera stays live!)
+            AnimatedVisibility(
+                visible = detectedCandidate != null,
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(10.dp)
+            ) {
+                val candidate = detectedCandidate ?: return@AnimatedVisibility
+                Surface(
+                    shape = RoundedCornerShape(BunkerRadius.Sheet),
+                    color = colors.cardSurface,
+                    border = BorderStroke(1.5.dp, colors.emerald.copy(alpha = 0.65f)),
+                    shadowElevation = 12.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        OutlinedTextField(
-                            value = manualCode,
-                            onValueChange = { manualCode = it },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            placeholder = {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            ProductThumbnail(
+                                imageSource = detectedExistingItem?.imageUri
+                                    ?: detectedExistingItem?.nutrition?.imageUrl
+                                    ?: candidate.prefill?.imageUri
+                                    ?: candidate.prefill?.nutrition?.imageUrl,
+                                category = ItemCategory.fromKey(detectedExistingItem?.category ?: candidate.prefill?.category),
+                                size = 46.dp
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = strings.scannerManualPlaceholder,
+                                    text = if (detectedExistingItem != null) strings.qsBadgeFound else strings.popupDetectedNew,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = colors.emerald
+                                )
+                                Text(
+                                    text = detectedExistingItem?.name
+                                        ?: candidate.prefill?.name?.ifBlank { candidate.code }
+                                        ?: candidate.code,
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Text(
+                                    text = candidate.code,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = colors.amber
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    analyzer.resetLastEmitted()
+                                    onDismissCandidate()
+                                },
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = strings.close,
+                                    tint = colors.mutedText
+                                )
+                            }
+                        }
+
+                        if (candidate.isLookingUp) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = colors.emerald)
+                                Text(strings.scannerLookingUp, style = MaterialTheme.typography.bodyMedium, color = colors.mutedText)
+                            }
+                        }
+
+                        val nut = detectedExistingItem?.nutrition ?: candidate.prefill?.nutrition
+                        if (nut != null) {
+                            NutritionBadgesRow(nutrition = nut)
+                        }
+
+                        if (detectedExistingItem != null) {
+                            val info = InventoryLogic.getExpiryInfo(detectedExistingItem, notApplicableLabel = strings.notApplicable)
+                            val unit = ItemUnit.fromKey(detectedExistingItem.unit)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "${strings.qsCurrentStock}: ${InventoryLogic.formatQty(detectedExistingItem.qty)} ${strings.unitLabel(unit)}",
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                                StatusBadge(info = info)
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = { onQuickAddExisting(detectedExistingItem.id, 1.0) },
+                                    shape = RoundedCornerShape(BunkerRadius.Control),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("+1")
+                                }
+                                OutlinedButton(
+                                    onClick = { onQuickAddExisting(detectedExistingItem.id, 6.0) },
+                                    shape = RoundedCornerShape(BunkerRadius.Control)
+                                ) {
+                                    Text("+6", fontFamily = FontFamily.Monospace)
+                                }
+                                Button(
+                                    onClick = onConfirmCandidate,
+                                    shape = RoundedCornerShape(BunkerRadius.Control),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = colors.amber,
+                                        contentColor = Color(0xFF111312)
+                                    ),
+                                    modifier = Modifier.weight(1.2f)
+                                ) {
+                                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(strings.popupOkOpen, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        } else {
+                            val prefill = candidate.prefill
+                            if (!prefill?.expiryDate.isNullOrBlank()) {
+                                Text(
+                                    text = "${strings.expiryLabel} ${prefill?.expiryDate}" +
+                                        if (!prefill?.notes.isNullOrBlank()) " · ${prefill?.notes}" else "",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = colors.mutedText
                                 )
-                            },
-                            textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            keyboardActions = KeyboardActions(
-                                onSearch = {
-                                    if (manualCode.isNotBlank()) {
-                                        onCodeScanned(manualCode.trim())
-                                        manualCode = ""
-                                    }
-                                }
-                            ),
-                            shape = RoundedCornerShape(BunkerRadius.Control),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = colors.canvas,
-                                unfocusedContainerColor = colors.canvas
-                            )
-                        )
-                        Button(
-                            onClick = {
-                                if (manualCode.isNotBlank()) {
-                                    onCodeScanned(manualCode.trim())
-                                    manualCode = ""
-                                }
-                            },
-                            shape = RoundedCornerShape(BunkerRadius.Control),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
-                            ),
-                            modifier = Modifier.height(54.dp)
-                        ) {
-                            Icon(Icons.Default.Search, contentDescription = strings.scannerManualSubmit)
+                            }
+                            Button(
+                                onClick = onConfirmCandidate,
+                                shape = RoundedCornerShape(BunkerRadius.Control),
+                                modifier = Modifier.fillMaxWidth().height(46.dp)
+                            ) {
+                                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(strings.popupOkRegister, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Non-blocking Bottom Detection Popup (keeps camera open until dismissed or confirmed!)
-        AnimatedVisibility(
-            visible = detectedCandidate != null,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+        // Slim docked manual code input bar (zero scroll needed!)
+        HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.7f))
+        Row(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(12.dp)
+                .background(colors.cardSurface)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            val candidate = detectedCandidate ?: return@AnimatedVisibility
-            Surface(
-                shape = RoundedCornerShape(BunkerRadius.Sheet),
-                color = colors.cardSurface,
-                border = BorderStroke(1.5.dp, colors.emerald.copy(alpha = 0.65f)),
-                shadowElevation = 12.dp,
-                modifier = Modifier.fillMaxWidth()
+            OutlinedTextField(
+                value = manualCode,
+                onValueChange = { manualCode = it },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                placeholder = {
+                    Text(
+                        text = strings.scannerManualPlaceholder,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.mutedText
+                    )
+                },
+                textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(
+                    onSearch = {
+                        if (manualCode.isNotBlank()) {
+                            onCodeScanned(manualCode.trim())
+                            manualCode = ""
+                        }
+                    }
+                ),
+                shape = RoundedCornerShape(BunkerRadius.Control),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = colors.canvas,
+                    unfocusedContainerColor = colors.canvas
+                )
+            )
+            Button(
+                onClick = {
+                    if (manualCode.isNotBlank()) {
+                        onCodeScanned(manualCode.trim())
+                        manualCode = ""
+                    }
+                },
+                shape = RoundedCornerShape(BunkerRadius.Control),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ),
+                modifier = Modifier.height(52.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Header with Product Photo + X dismiss button
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        ProductThumbnail(
-                            imageSource = detectedExistingItem?.imageUri
-                                ?: detectedExistingItem?.nutrition?.imageUrl
-                                ?: candidate.prefill?.imageUri
-                                ?: candidate.prefill?.nutrition?.imageUrl,
-                            category = ItemCategory.fromKey(detectedExistingItem?.category ?: candidate.prefill?.category),
-                            size = 48.dp
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if (detectedExistingItem != null) strings.qsBadgeFound else strings.popupDetectedNew,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = colors.emerald
-                            )
-                            Text(
-                                text = detectedExistingItem?.name
-                                    ?: candidate.prefill?.name?.ifBlank { candidate.code }
-                                    ?: candidate.code,
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            Text(
-                                text = candidate.code,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = colors.amber
-                            )
-                        }
-                        IconButton(
-                            onClick = {
-                                analyzer.resetLastEmitted()
-                                onDismissCandidate()
-                            },
-                            modifier = Modifier.size(44.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = strings.close,
-                                tint = colors.mutedText
-                            )
-                        }
-                    }
-
-                    if (candidate.isLookingUp) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = colors.emerald)
-                            Text(strings.scannerLookingUp, style = MaterialTheme.typography.bodyMedium, color = colors.mutedText)
-                        }
-                    }
-
-                    // Show nutrition & health score if enriched
-                    val nut = detectedExistingItem?.nutrition ?: candidate.prefill?.nutrition
-                    if (nut != null) {
-                        NutritionBadgesRow(nutrition = nut)
-                    }
-
-                    // Existing item telemetry or estimated expiry preview
-                    if (detectedExistingItem != null) {
-                        val info = InventoryLogic.getExpiryInfo(detectedExistingItem, notApplicableLabel = strings.notApplicable)
-                        val unit = ItemUnit.fromKey(detectedExistingItem.unit)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "${strings.qsCurrentStock}: ${InventoryLogic.formatQty(detectedExistingItem.qty)} ${strings.unitLabel(unit)}",
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                            StatusBadge(info = info)
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Button(
-                                onClick = { onQuickAddExisting(detectedExistingItem.id, 1.0) },
-                                shape = RoundedCornerShape(BunkerRadius.Control),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("+1")
-                            }
-                            OutlinedButton(
-                                onClick = { onQuickAddExisting(detectedExistingItem.id, 6.0) },
-                                shape = RoundedCornerShape(BunkerRadius.Control)
-                            ) {
-                                Text("+6", fontFamily = FontFamily.Monospace)
-                            }
-                            Button(
-                                onClick = onConfirmCandidate,
-                                shape = RoundedCornerShape(BunkerRadius.Control),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = colors.amber,
-                                    contentColor = Color(0xFF090D16)
-                                ),
-                                modifier = Modifier.weight(1.2f)
-                            ) {
-                                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text(strings.popupOkOpen, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    } else {
-                        val prefill = candidate.prefill
-                        if (!prefill?.expiryDate.isNullOrBlank()) {
-                            Text(
-                                text = "${strings.expiryLabel} ${prefill?.expiryDate}" +
-                                    if (!prefill?.notes.isNullOrBlank()) " · ${prefill?.notes}" else "",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = colors.mutedText
-                            )
-                        }
-                        Button(
-                            onClick = onConfirmCandidate,
-                            shape = RoundedCornerShape(BunkerRadius.Control),
-                            modifier = Modifier.fillMaxWidth().height(48.dp)
-                        ) {
-                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text(strings.popupOkRegister, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
+                Icon(Icons.Default.Search, contentDescription = strings.scannerManualSubmit)
             }
+        }
+    }
+}
+
+@Composable
+private fun ViewfinderIconButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    tint: Color,
+    active: Boolean,
+    activeBg: Color = Color(0xCC111312),
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(BunkerRadius.Control),
+        color = if (active) activeBg else Color(0xBB111312),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+        modifier = Modifier.size(42.dp)
+    ) {
+        IconButton(onClick = onClick, modifier = Modifier.fillMaxSize()) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = tint,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }

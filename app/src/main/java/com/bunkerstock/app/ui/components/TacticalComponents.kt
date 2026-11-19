@@ -4,6 +4,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -128,54 +130,78 @@ fun CriticalAlertBanner(
     val title = "${strings.alertRotationPrefix} ${parts.joinToString(strings.alertJoinAnd)}"
     val desc = if (expiredCount > 0) strings.alertDescExpired else strings.alertDescCritical
 
-    // Slim, flat hazard strip (no bulky card box)
+    // Ultra-compact single-row horizontally scrollable hazard strip (~40dp tall)
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(colors.dangerBannerBg.copy(alpha = 0.72f))
+            .background(colors.dangerBannerBg.copy(alpha = 0.78f))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                .height(42.dp)
+                .padding(end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
                     .width(3.dp)
-                    .height(36.dp)
+                    .fillMaxHeight()
                     .background(colors.danger)
             )
-            Column(modifier = Modifier.weight(1f)) {
+            Spacer(Modifier.width(10.dp))
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                tint = colors.danger,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .horizontalScroll(rememberScrollState()),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 13.sp),
-                    color = if (colors.isDark) Color(0xFFFECACA) else Color(0xFF7F1D1D)
+                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 12.5.sp),
+                    color = if (colors.isDark) Color(0xFFFECACA) else Color(0xFF7F1D1D),
+                    maxLines = 1
                 )
                 Text(
-                    text = desc,
+                    text = "· $desc",
                     style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
-                    color = if (colors.isDark) Color(0xFFFCA5A5).copy(alpha = 0.85f) else Color(0xFF991B1B),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    color = if (colors.isDark) Color(0xFFFCA5A5).copy(alpha = 0.8f) else Color(0xFF991B1B),
+                    maxLines = 1
                 )
             }
-            androidx.compose.material3.TextButton(
-                onClick = onReviewClick,
-                colors = ButtonDefaults.textButtonColors(contentColor = colors.danger)
+            Box(
+                modifier = Modifier
+                    .padding(start = 6.dp)
+                    .clip(RoundedCornerShape(BunkerRadius.Badge))
+                    .background(colors.danger.copy(alpha = 0.2f))
+                    .border(1.dp, colors.danger.copy(alpha = 0.5f), RoundedCornerShape(BunkerRadius.Badge))
+                    .clickable(role = Role.Button, onClick = onReviewClick)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
-                Text(strings.reviewAffected, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text(
+                    text = strings.reviewAffected,
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = if (colors.isDark) Color(0xFFFECACA) else colors.danger,
+                    maxLines = 1
+                )
             }
             IconButton(
                 onClick = onDismiss,
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(36.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
                     contentDescription = strings.dismissAlert,
                     tint = colors.danger,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }

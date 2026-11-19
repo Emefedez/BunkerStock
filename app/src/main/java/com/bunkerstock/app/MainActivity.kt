@@ -62,8 +62,10 @@ import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSiz
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -166,6 +168,13 @@ private fun BunkerStockApp(
     val strings = LocalAppStrings.current
     val colors = LocalBunkerColors.current
     val snackbarHostState = remember { SnackbarHostState() }
+    val warehouseGridState = rememberLazyGridState()
+    val fabExpanded by remember {
+        derivedStateOf {
+            warehouseGridState.firstVisibleItemIndex == 0 &&
+                warehouseGridState.firstVisibleItemScrollOffset < 60
+        }
+    }
     var scannerUnlockCounter by remember { mutableIntStateOf(0) }
     var dataMenuExpanded by remember { mutableStateOf(false) }
 
@@ -321,7 +330,7 @@ private fun BunkerStockApp(
                                     border = BorderStroke(1.dp, colors.borderSubtle)
                                 ) {
                                     Text(
-                                        text = "V2.8",
+                                        text = "V2.9",
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontFamily = FontFamily.Monospace,
                                             fontSize = 9.sp
@@ -477,10 +486,11 @@ private fun BunkerStockApp(
             if (!state.scannerForForm && state.activeTab == BunkerTab.WAREHOUSE) {
                 ExtendedFloatingActionButton(
                     onClick = { viewModel.openAddItem() },
+                    expanded = fabExpanded,
                     shape = RoundedCornerShape(BunkerRadius.Card),
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
-                    icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                    icon = { Icon(Icons.Default.Add, contentDescription = strings.addItem) },
                     text = { Text(strings.addItem, fontWeight = FontWeight.Bold) }
                 )
             }
@@ -552,7 +562,8 @@ private fun BunkerStockApp(
                             onAdjustQty = { id, delta -> viewModel.adjustQuantity(id, delta) },
                             onOpenQr = viewModel::openQrLabel,
                             onEditItem = viewModel::openEditItem,
-                            onDeleteItem = viewModel::requestDeleteItem
+                            onDeleteItem = viewModel::requestDeleteItem,
+                            gridState = warehouseGridState
                         )
                     }
 
