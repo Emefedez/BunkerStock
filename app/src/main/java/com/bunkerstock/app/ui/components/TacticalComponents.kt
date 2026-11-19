@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocationOn
@@ -95,6 +96,7 @@ fun categoryStyle(category: ItemCategory): Triple<ImageVector, Color, Color> {
         ItemCategory.WATER -> Triple(Icons.Default.WaterDrop, c.cyan, c.cyanContainer)
         ItemCategory.MATERIALS -> Triple(Icons.Default.MedicalServices, c.rose, c.roseContainer)
         ItemCategory.TOOLS -> Triple(Icons.Default.Bolt, c.amber, c.amberContainer)
+        ItemCategory.OTHER -> Triple(Icons.Default.HelpOutline, c.infoBlue, c.cardElevated)
     }
 }
 
@@ -700,6 +702,7 @@ fun InventoryItemCard(
     expiredDays: Int = 0,
     criticalDays: Int = 30,
     warningDays: Int = 90,
+    onCardClick: () -> Unit = {},
     onDecrement: () -> Unit,
     onIncrement: () -> Unit,
     onQrClick: () -> Unit,
@@ -740,6 +743,7 @@ fun InventoryItemCard(
             .clip(RoundedCornerShape(BunkerRadius.Control))
             .background(rowBg)
             .border(1.dp, colors.borderSubtle.copy(alpha = 0.55f), RoundedCornerShape(BunkerRadius.Control))
+            .clickable(onClick = onCardClick)
     ) {
         Row(modifier = Modifier.fillMaxWidth()) {
             if (accentBar != Color.Transparent) {
@@ -817,6 +821,17 @@ fun InventoryItemCard(
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.5.sp),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            if (item.batches.size > 1) {
+                                Text(
+                                    text = "· ${strings.detailBatchesBadge(item.batches.size)}",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = colors.amber,
+                                    maxLines = 1
+                                )
+                            }
                             if (item.location.isNotBlank()) {
                                 Text(
                                     text = "· ${item.location}",

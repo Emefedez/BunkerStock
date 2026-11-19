@@ -1,6 +1,7 @@
 package com.bunkerstock.app.domain
 
 import com.bunkerstock.app.data.DashboardMetrics
+import com.bunkerstock.app.data.ExpiryBatch
 import com.bunkerstock.app.data.ExpiryInfo
 import com.bunkerstock.app.data.ExpiryStatus
 import com.bunkerstock.app.data.InventoryItem
@@ -59,7 +60,11 @@ object InventoryLogic {
             expiryDate = relativeDateString(14, today),
             location = "Estantería 1 - Balda B",
             notes = "Rotar urgentemente al consumo diario",
-            nutrition = ProductNutrition(nutriScoreGrade = "B", novaGroup = 2, healthScore = 76)
+            nutrition = ProductNutrition(nutriScoreGrade = "B", novaGroup = 2, healthScore = 76),
+            batches = listOf(
+                ExpiryBatch(id = "b-2a", qty = 3.0, expiryDate = relativeDateString(14, today), note = "Lote antiguo"),
+                ExpiryBatch(id = "b-2b", qty = 5.0, expiryDate = relativeDateString(95, today), note = "Compra reciente")
+            )
         ),
         InventoryItem(
             id = "item-3",
@@ -502,5 +507,25 @@ object InventoryLogic {
         } else {
             String.format(java.util.Locale.US, "%.1f", rounded)
         }
+    }
+
+    /**
+     * When an item tracks multiple expiry batches ("tandadas"), syncs total qty to the sum
+     * of batch quantities and sets primary expiryDate to the soonest valid batch date.
+     */
+    fun normalizeWithBatches(item: InventoryItem): InventoryItem {
+        if (item.batches.isEmpty()) return item
+        val totalQty = item.batches.sumOf { it.qty.coerceAtLeast(0.0) }
+        val soonest = item.batches
+            .mapNotNull { b ->
+                runCatching { LocalDate.parse(b.expiryDate.trim(), isoFormatter) }.getOrNull()?.let { it to b.expiryDate.trim() }
+            }
+            .minByOrNull { it.first }
+            ?.second
+            ?: item.expiryDate
+        return item.copy(
+            qty = (totalQty * 100.0).roundToInt() / 100.0,
+            expiryDate = if (item.noExpiry) "" else soonest
+        )
     }
 }

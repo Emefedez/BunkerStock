@@ -333,7 +333,7 @@ fun ItemEditorSheet(
                                             unit = ItemUnit.UNITS
                                             noExpiry = false
                                         }
-                                        ItemCategory.MATERIALS -> Unit
+                                        ItemCategory.MATERIALS, ItemCategory.OTHER -> Unit
                                     }
                                 }
                                 catExpanded = false
@@ -492,7 +492,8 @@ fun ItemEditorSheet(
                             location = location.trim(),
                             notes = notes.trim(),
                             imageUri = imageUri,
-                            nutrition = nutrition
+                            nutrition = nutrition,
+                            batches = editingItem?.batches.orEmpty()
                         )
                         onSave(item, isEdit)
                     },

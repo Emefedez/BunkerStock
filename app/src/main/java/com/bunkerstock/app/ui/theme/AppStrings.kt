@@ -272,7 +272,20 @@ data class AppStrings(
     val toastBatchPdfSaved: String,
     val toastBatchPdfShared: String,
     val setupWelcomeSubtitle: String,
-    val setupContinue: String
+    val setupContinue: String,
+    val detailBatchesTitle: String,
+    val detailAddBatch: String,
+    val detailAllBatches: String,
+    val detailBatchNumber: (Int) -> String,
+    val detailCalendarToday: String,
+    val detailCalendarTapHint: String,
+    val detailQrSection: String,
+    val detailNotesSection: String,
+    val detailLocationEmpty: String,
+    val detailYukaLabel: String,
+    val detailNutriScoreLabel: String,
+    val detailNoScore: String,
+    val detailBatchesBadge: (Int) -> String
 ) {
     fun kpiCriticalTitle(criticalDays: Int): String = when (language) {
         AppLanguage.ES -> "PRÓX. $criticalDays DÍAS"
@@ -324,12 +337,14 @@ data class AppStrings(
             ItemCategory.WATER -> "Agua"
             ItemCategory.MATERIALS -> "Materiales"
             ItemCategory.TOOLS -> "Herramientas"
+            ItemCategory.OTHER -> "Otro"
         }
         AppLanguage.EN -> when (category) {
             ItemCategory.FOOD -> "Food"
             ItemCategory.WATER -> "Water"
             ItemCategory.MATERIALS -> "Medical / Gear"
             ItemCategory.TOOLS -> "Tools / Power"
+            ItemCategory.OTHER -> "Other"
         }
     }
 
@@ -339,12 +354,14 @@ data class AppStrings(
             ItemCategory.WATER -> "Agua"
             ItemCategory.MATERIALS -> "Supervivencia / Botiquín"
             ItemCategory.TOOLS -> "Herramientas / Energía"
+            ItemCategory.OTHER -> "Otro"
         }
         AppLanguage.EN -> when (category) {
             ItemCategory.FOOD -> "Food"
             ItemCategory.WATER -> "Water"
             ItemCategory.MATERIALS -> "Survival / First Aid"
             ItemCategory.TOOLS -> "Tools / Power"
+            ItemCategory.OTHER -> "Other"
         }
     }
 
@@ -674,7 +691,20 @@ val SpanishStrings = AppStrings(
     toastBatchPdfSaved = "PDF de etiquetas QR guardado",
     toastBatchPdfShared = "PDF de etiquetas QR listo para compartir",
     setupWelcomeSubtitle = "Elige tu idioma preferido. Podrás cambiarlo en cualquier momento desde Ajustes.",
-    setupContinue = "Comenzar"
+    setupContinue = "Comenzar",
+    detailBatchesTitle = "TANDADAS / LOTES",
+    detailAddBatch = "+ Tandada",
+    detailAllBatches = "Todas",
+    detailBatchNumber = { "Tandada $it" },
+    detailCalendarToday = "Hoy",
+    detailCalendarTapHint = "Toca un día para cambiar la caducidad de la tandada activa",
+    detailQrSection = "ETIQUETA QR",
+    detailNotesSection = "NOTAS Y UBICACIÓN",
+    detailLocationEmpty = "Sin ubicación asignada",
+    detailYukaLabel = "SCORE YUKA",
+    detailNutriScoreLabel = "NUTRI-SCORE",
+    detailNoScore = "Sin datos",
+    detailBatchesBadge = { "$it tandadas" }
 )
 
 val EnglishStrings = AppStrings(
@@ -919,7 +949,20 @@ val EnglishStrings = AppStrings(
     toastBatchPdfSaved = "Batch QR PDF saved",
     toastBatchPdfShared = "Batch QR PDF ready to share",
     setupWelcomeSubtitle = "Choose your preferred language. You can change this anytime in Settings.",
-    setupContinue = "Continue"
+    setupContinue = "Continue",
+    detailBatchesTitle = "BATCHES / LOTS",
+    detailAddBatch = "+ Batch",
+    detailAllBatches = "All",
+    detailBatchNumber = { "Batch $it" },
+    detailCalendarToday = "Today",
+    detailCalendarTapHint = "Tap any day to update the active batch's expiry date",
+    detailQrSection = "QR LABEL",
+    detailNotesSection = "NOTES & PLACEMENT",
+    detailLocationEmpty = "No placement assigned",
+    detailYukaLabel = "YUKA SCORE",
+    detailNutriScoreLabel = "NUTRI-SCORE",
+    detailNoScore = "No data",
+    detailBatchesBadge = { "$it batches" }
 )
 
 fun stringsFor(language: AppLanguage): AppStrings = when (language) {

@@ -94,6 +94,7 @@ import com.bunkerstock.app.ui.components.ConfirmActionDialog
 import com.bunkerstock.app.ui.components.FamilyGroupDialog
 import com.bunkerstock.app.ui.components.FirstTimeSetupDialog
 import com.bunkerstock.app.ui.components.ItemEditorSheet
+import com.bunkerstock.app.ui.components.ProductDetailOverlay
 import com.bunkerstock.app.ui.components.QrLabelDialog
 import com.bunkerstock.app.ui.components.QuickScanActionSheet
 import com.bunkerstock.app.scanner.QrCodeUtils
@@ -646,6 +647,7 @@ private fun BunkerStockApp(
                             onResetFilters = viewModel::resetFilters,
                             onDismissBanner = viewModel::dismissBanner,
                             onAdjustQty = { id, delta -> viewModel.adjustQuantity(id, delta) },
+                            onOpenDetail = viewModel::openItemDetail,
                             onOpenQr = viewModel::openQrLabel,
                             onEditItem = viewModel::openEditItem,
                             onDeleteItem = viewModel::requestDeleteItem,
@@ -679,6 +681,21 @@ private fun BunkerStockApp(
             }
         }
     }
+
+    // Animated Product Detail Overlay (hero photo, Nutri-Score + BioShock Yuka gauge, batches & interactive calendar)
+    ProductDetailOverlay(
+        item = state.detailItem,
+        expiredDays = state.settings.expiredThresholdDays,
+        criticalDays = state.settings.criticalThresholdDays,
+        warningDays = state.settings.warningThresholdDays,
+        onUpdateItem = viewModel::updateItemLive,
+        onOpenFullEditor = { item ->
+            viewModel.closeItemDetail()
+            viewModel.openEditItem(item)
+        },
+        onMessage = viewModel::notifyMessage,
+        onDismiss = viewModel::closeItemDetail
+    )
 
     // Add / Edit Bottom Sheet (hidden while inline form scanner is active)
     if (state.showItemSheet && !state.scannerForForm) {

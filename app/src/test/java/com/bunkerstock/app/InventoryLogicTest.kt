@@ -227,5 +227,22 @@ class InventoryLogicTest {
         assertEquals(1, com.bunkerstock.app.scanner.QrCodeUtils.batchPageCount(24))
         assertEquals(2, com.bunkerstock.app.scanner.QrCodeUtils.batchPageCount(25))
         assertEquals(3, com.bunkerstock.app.scanner.QrCodeUtils.batchPageCount(49))
+
+        // Multi-batch normalization sums quantities and selects soonest expiry date
+        val batched = InventoryItem(
+            id = "batched-1",
+            name = "Conservas",
+            category = ItemCategory.OTHER.storageKey,
+            qty = 1.0,
+            expiryDate = "2028-01-01",
+            batches = listOf(
+                com.bunkerstock.app.data.ExpiryBatch(id = "b1", qty = 4.0, expiryDate = "2027-06-15"),
+                com.bunkerstock.app.data.ExpiryBatch(id = "b2", qty = 6.0, expiryDate = "2027-02-10")
+            )
+        )
+        val norm = InventoryLogic.normalizeWithBatches(batched)
+        assertEquals(10.0, norm.qty, 0.01)
+        assertEquals("2027-02-10", norm.expiryDate)
+        assertEquals(ItemCategory.OTHER, ItemCategory.fromKey("Otro"))
     }
 }

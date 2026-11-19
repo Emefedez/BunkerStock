@@ -21,6 +21,14 @@ data class ProductNutrition(
 )
 
 @Serializable
+data class ExpiryBatch(
+    val id: String,
+    val qty: Double = 1.0,
+    val expiryDate: String = "", // yyyy-MM-dd
+    val note: String = ""
+)
+
+@Serializable
 data class InventoryItem(
     val id: String,
     val barcode: String = "",
@@ -29,11 +37,12 @@ data class InventoryItem(
     val qty: Double = 1.0,
     val unit: String = ItemUnit.UNITS.storageKey,
     val noExpiry: Boolean = false,
-    val expiryDate: String = "", // yyyy-MM-dd
+    val expiryDate: String = "", // yyyy-MM-dd (soonest active expiry when batches exist)
     val location: String = "",
     val notes: String = "",
     val imageUri: String? = null,
     val nutrition: ProductNutrition? = null,
+    val batches: List<ExpiryBatch> = emptyList(),
     val updatedAt: Long = 0L,
     val updatedBy: String = ""
 )
@@ -62,7 +71,8 @@ enum class ItemCategory(val storageKey: String) {
     FOOD("Alimentos"),
     WATER("Agua"),
     MATERIALS("Materiales"),
-    TOOLS("Herramientas");
+    TOOLS("Herramientas"),
+    OTHER("Otro");
 
     companion object {
         fun fromKey(key: String?): ItemCategory =

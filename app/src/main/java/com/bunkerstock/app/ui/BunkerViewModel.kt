@@ -71,6 +71,7 @@ data class BunkerUiState(
     val detectedCandidate: DetectedScanCandidate? = null,
     val quickScanItemId: String? = null,
     val qrLabelItemId: String? = null,
+    val detailItemId: String? = null,
     val showBatchQrDialog: Boolean = false,
     val pendingConfirm: PendingConfirm? = null,
     val availableUpdate: AppUpdateInfo? = null,
@@ -93,6 +94,9 @@ data class BunkerUiState(
 
     val qrLabelItem: InventoryItem?
         get() = qrLabelItemId?.let { id -> inventory.firstOrNull { it.id == id } }
+
+    val detailItem: InventoryItem?
+        get() = detailItemId?.let { id -> inventory.firstOrNull { it.id == id } }
 }
 
 private data class LocalUiFilters(
@@ -113,6 +117,7 @@ private data class ModalState(
     val detectedCandidate: DetectedScanCandidate? = null,
     val quickScanItemId: String? = null,
     val qrLabelItemId: String? = null,
+    val detailItemId: String? = null,
     val showBatchQrDialog: Boolean = false,
     val pendingConfirm: PendingConfirm? = null,
     val availableUpdate: AppUpdateInfo? = null,
@@ -174,6 +179,7 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
             detectedCandidate = modals.detectedCandidate,
             quickScanItemId = modals.quickScanItemId,
             qrLabelItemId = modals.qrLabelItemId,
+            detailItemId = modals.detailItemId,
             showBatchQrDialog = modals.showBatchQrDialog,
             pendingConfirm = modals.pendingConfirm,
             availableUpdate = modals.availableUpdate,
@@ -360,12 +366,29 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
             val idx = current.indexOfFirst { it.id == itemId }
             if (idx < 0) return@launch
             val existing = current[idx]
-            val newQty = max(0.0, ((existing.qty + delta) * 100.0).roundToInt() / 100.0)
-            current[idx] = existing.copy(
-                qty = newQty,
-                updatedAt = System.currentTimeMillis(),
-                updatedBy = uiState.value.familyGroup.memberName
-            )
+            val updatedItem = if (existing.batches.isNotEmpty()) {
+                val sortedBatches = existing.batches.sortedBy { it.expiryDate.ifBlank { "9999-12-31" } }.toMutableList()
+                val targetIdx = if (delta < 0) {
+                    sortedBatches.indexOfFirst { it.qty > 0.0 }.takeIf { it >= 0 } ?: 0
+                } else {
+                    sortedBatches.lastIndex
+                }
+                val b = sortedBatches[targetIdx]
+                sortedBatches[targetIdx] = b.copy(qty = max(0.0, ((b.qty + delta) * 100.0).roundToInt() / 100.0))
+                InventoryLogic.normalizeWithBatches(existing.copy(batches = sortedBatches)).copy(
+                    updatedAt = System.currentTimeMillis(),
+                    updatedBy = uiState.value.familyGroup.memberName
+                )
+            } else {
+                val newQty = max(0.0, ((existing.qty + delta) * 100.0).roundToInt() / 100.0)
+                existing.copy(
+                    qty = newQty,
+                    updatedAt = System.currentTimeMillis(),
+                    updatedBy = uiState.value.familyGroup.memberName
+                )
+            }
+            val newQty = updatedItem.qty
+            current[idx] = updatedItem
             repository.saveInventory(current)
             if (notifyQuickAdd) {
                 emitToast(
@@ -635,6 +658,41 @@ class BunkerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun closeQrLabel() {
         modalFlow.update { it.copy(qrLabelItemId = null) }
+    }
+
+    fun openItemDetail(itemId: String) {
+        viewModelScope.launch {
+            val current = uiState.value.inventory.toMutableList()
+            val idx = current.indexOfFirst { it.id == itemId }
+            if (idx < 0) return@launch
+            val item = current[idx]
+            if (item.barcode.isBlank()) {
+                val generated = "BNK-" + System.currentTimeMillis().toString().takeLast(6)
+                current[idx] = item.copy(barcode = generated)
+                repository.saveInventory(current)
+            }
+            modalFlow.update { it.copy(detailItemId = itemId) }
+        }
+    }
+
+    fun closeItemDetail() {
+        modalFlow.update { it.copy(detailItemId = null) }
+    }
+
+    fun updateItemLive(updated: InventoryItem) {
+        viewModelScope.launch {
+            val normalized = InventoryLogic.normalizeWithBatches(updated).copy(
+                updatedAt = System.currentTimeMillis(),
+                updatedBy = uiState.value.familyGroup.memberName
+            )
+            val current = uiState.value.inventory.toMutableList()
+            val idx = current.indexOfFirst { it.id == normalized.id }
+            if (idx < 0) return@launch
+            current[idx] = normalized
+            repository.saveInventory(current)
+            ExpiryNotificationHelper.evaluateAndNotify(getApplication(), repository)
+            if (uiState.value.familyGroup.isJoined) syncFamilyNow(silent = true)
+        }
     }
 
     fun openBatchQrDialog() {
