@@ -170,7 +170,7 @@ object FamilySyncClient {
     private suspend fun writeCipherToEndpoint(endpoint: String, cipherText: String) {
         val headers = if (isWebPlatform) emptyMap() else mapOf(
             "Accept" to "text/plain, */*",
-            "User-Agent" to "BunkerStock-Android/3.4"
+            "User-Agent" to "BunkerStock-Android/3.5"
         )
         val ok = PlatformHttp.postText(
             url = endpoint,
@@ -183,7 +183,7 @@ object FamilySyncClient {
     }
 
     private suspend fun readCipherFromEndpoint(endpoint: String): String? {
-        val headers = if (isWebPlatform) emptyMap() else mapOf("User-Agent" to "BunkerStock-Android/3.4")
+        val headers = if (isWebPlatform) emptyMap() else mapOf("User-Agent" to "BunkerStock-Android/3.5")
         val raw = PlatformHttp.getText(url = endpoint, headers = headers, timeoutMs = 10000)?.trim()
             ?: return null
         if (raw.isBlank() || raw == "null") return null

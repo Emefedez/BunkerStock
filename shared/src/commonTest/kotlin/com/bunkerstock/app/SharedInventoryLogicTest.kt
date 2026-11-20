@@ -172,6 +172,23 @@ class SharedInventoryLogicTest {
     }
 
     @Test
+    fun gs1DigitalLinkMercadonaQrParsesCleanEanExpiryAndBatch() {
+        val mercadonaQr = "https://qrtrack.mercadona.es/01/08421610357742/10/323414199?17=261127&16=261123"
+        assertTrue(InventoryLogic.isLikelyRawCode(mercadonaQr))
+        val parsed = InventoryLogic.parseGs1Code(mercadonaQr)
+        assertTrue(parsed.isGs1DigitalLink)
+        assertEquals("8421610357742", parsed.barcode)
+        assertEquals("2026-11-27", parsed.expiryIso)
+        assertEquals("323414199", parsed.batch)
+
+        // Classic GS1-128 with parentheses also normalizes GTIN-14 -> EAN-13
+        val classic = InventoryLogic.parseGs1Code("(01)08410076472199(17)270515(10)LOTE42B")
+        assertEquals("8410076472199", classic.barcode)
+        assertEquals("2027-05-15", classic.expiryIso)
+        assertEquals("LOTE42B", classic.batch)
+    }
+
+    @Test
     fun batchesAndStructuredQrWork() {
         val batched = InventoryItem(
             id = "batched-1",

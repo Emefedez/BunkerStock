@@ -37,10 +37,16 @@ interface BunkerStorage {
 interface BunkerPlatform {
     val supportsNativeNotifications: Boolean get() = false
     val supportsApkSelfUpdate: Boolean get() = false
-    val versionTag: String get() = "V3.4"
+    val versionTag: String get() = "V3.5"
 
     /** Optional HTTPS invite base URL (used on Web so shared links open the PWA directly). */
     val webInviteBaseUrl: String? get() = null
+
+    /** Optional Web/PWA install helpers (unused on native Android). */
+    val isRunningAsInstalledPwa: Boolean get() = false
+    val isIosBrowser: Boolean get() = false
+    val canPromptPwaInstall: Boolean get() = false
+    fun promptPwaInstall(onResult: (Boolean) -> Unit) { onResult(false) }
 
     fun playScanFeedback() {}
 

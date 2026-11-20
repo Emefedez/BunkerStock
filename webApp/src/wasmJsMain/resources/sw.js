@@ -1,5 +1,15 @@
-const CACHE_NAME = 'bunkerstock-pwa-v34';
-const SHELL_ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg', './qr-encoder.js', './bunker-web-bridge.js'];
+const CACHE_NAME = 'bunkerstock-pwa-v35';
+const SHELL_ASSETS = [
+  './',
+  './index.html',
+  './manifest.webmanifest',
+  './apple-touch-icon.png',
+  './icon-192.png',
+  './icon-512.png',
+  './icon.svg',
+  './qr-encoder.js',
+  './bunker-web-bridge.js'
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

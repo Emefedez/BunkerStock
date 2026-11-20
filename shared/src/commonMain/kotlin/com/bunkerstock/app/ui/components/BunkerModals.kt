@@ -92,6 +92,7 @@ import com.bunkerstock.app.domain.InventoryLogic
 import com.bunkerstock.app.platform.BunkerDate
 import com.bunkerstock.app.platform.LocalBunkerPlatform
 import com.bunkerstock.app.platform.currentTimeMillis
+import com.bunkerstock.app.platform.isWebPlatform
 import com.bunkerstock.app.ui.PendingConfirm
 import com.bunkerstock.app.ui.theme.BunkerRadius
 import com.bunkerstock.app.ui.theme.BunkerShieldLogo
@@ -1266,6 +1267,8 @@ fun FirstTimeSetupDialog(
 ) {
     val strings = LocalAppStrings.current
     val colors = LocalBunkerColors.current
+    val platform = LocalBunkerPlatform.current
+    var pwaInstalled by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = {},
@@ -1280,6 +1283,7 @@ fun FirstTimeSetupDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -1356,6 +1360,66 @@ fun FirstTimeSetupDialog(
                                     style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
                                     color = colors.mutedText
                                 )
+                            }
+                        }
+                    }
+                }
+
+                // Optional Web App (PWA) install tip/button — Web only, hidden when already installed
+                if (isWebPlatform && !platform.isRunningAsInstalledPwa) {
+                    Surface(
+                        shape = RoundedCornerShape(BunkerRadius.Control),
+                        color = colors.canvas,
+                        border = BorderStroke(1.dp, colors.cyan.copy(alpha = 0.45f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (pwaInstalled) Icons.Default.CheckCircle else Icons.Default.Download,
+                                    contentDescription = null,
+                                    tint = if (pwaInstalled) colors.emerald else colors.cyan,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    text = if (pwaInstalled) strings.setupPwaInstalled else strings.setupPwaTitle,
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                    color = if (pwaInstalled) colors.emerald else colors.cyan
+                                )
+                            }
+                            if (!pwaInstalled) {
+                                Text(
+                                    text = if (platform.isIosBrowser) strings.setupPwaIosHint else strings.setupPwaGenericHint,
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
+                                    color = colors.mutedText
+                                )
+                                if (platform.canPromptPwaInstall) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            platform.promptPwaInstall { accepted ->
+                                                if (accepted) pwaInstalled = true
+                                            }
+                                        },
+                                        shape = RoundedCornerShape(BunkerRadius.Control),
+                                        border = BorderStroke(1.dp, colors.cyan),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Download,
+                                            contentDescription = null,
+                                            tint = colors.cyan,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(strings.setupPwaInstallBtn, color = colors.cyan, fontWeight = FontWeight.Bold)
+                                    }
+                                }
                             }
                         }
                     }

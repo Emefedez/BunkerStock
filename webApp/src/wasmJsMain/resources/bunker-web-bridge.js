@@ -112,12 +112,26 @@
     }
   }
 
+  // PWA install prompt capture (Chrome / Edge / Android browsers)
+  let deferredInstallPrompt = null;
+  let pwaInstalledByEvent = false;
+  global.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+  });
+  global.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    pwaInstalledByEvent = true;
+  });
+
   function setVideoBounds(leftPx, topPx, widthPx, heightPx) {
     const video = document.getElementById('bunker-cam');
     if (!video) return;
     const dpr = global.devicePixelRatio || 1;
-    video.style.left = (leftPx / dpr) + 'px';
-    video.style.top = (topPx / dpr) + 'px';
+    const root = document.getElementById('compose-root');
+    const rootRect = root ? root.getBoundingClientRect() : { left: 0, top: 0 };
+    video.style.left = (rootRect.left + leftPx / dpr) + 'px';
+    video.style.top = (rootRect.top + topPx / dpr) + 'px';
     video.style.width = Math.max(1, widthPx / dpr) + 'px';
     video.style.height = Math.max(1, heightPx / dpr) + 'px';
   }
@@ -288,6 +302,48 @@
 
     getWebBaseUrl: function () {
       return location.origin + location.pathname.replace(/\/index\.html$/i, '');
+    },
+
+    // PWA Install helpers
+    isStandalonePwa: function () {
+      try {
+        return Boolean(
+          pwaInstalledByEvent ||
+          (global.matchMedia && global.matchMedia('(display-mode: standalone)').matches) ||
+          global.navigator.standalone === true
+        );
+      } catch (_) {
+        return false;
+      }
+    },
+
+    isIosSafari: function () {
+      try {
+        const ua = global.navigator.userAgent || '';
+        return /iPad|iPhone|iPod/.test(ua) || (global.navigator.platform === 'MacIntel' && global.navigator.maxTouchPoints > 1);
+      } catch (_) {
+        return false;
+      }
+    },
+
+    canPromptInstall: function () {
+      return Boolean(deferredInstallPrompt);
+    },
+
+    promptInstall: async function () {
+      if (!deferredInstallPrompt) return 'false';
+      try {
+        deferredInstallPrompt.prompt();
+        const choice = await deferredInstallPrompt.userChoice;
+        deferredInstallPrompt = null;
+        if (choice && choice.outcome === 'accepted') {
+          pwaInstalledByEvent = true;
+          return 'true';
+        }
+        return 'false';
+      } catch (_) {
+        return 'false';
+      }
     },
 
     // HTTP

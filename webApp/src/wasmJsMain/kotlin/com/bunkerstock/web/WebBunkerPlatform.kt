@@ -36,6 +36,10 @@ private fun jsDownloadText(filename: String, content: String, mime: String): Boo
 private fun jsPickTextFile(): Promise<JsString> = js("window.BunkerWeb.pickTextFile()")
 private fun jsPickPhotoDataUrl(maxDim: Int): Promise<JsString> = js("window.BunkerWeb.pickPhotoDataUrl(maxDim)")
 private fun jsShareText(title: String, text: String): Unit = js("window.BunkerWeb.shareText(title, text)")
+private fun jsIsStandalonePwa(): Boolean = js("window.BunkerWeb.isStandalonePwa()")
+private fun jsIsIosSafari(): Boolean = js("window.BunkerWeb.isIosSafari()")
+private fun jsCanPromptInstall(): Boolean = js("window.BunkerWeb.canPromptInstall()")
+private fun jsPromptInstall(): Promise<JsString> = js("window.BunkerWeb.promptInstall()")
 
 @Serializable
 private data class BatchQrPayloadItem(val code: String, val name: String, val exp: String)
@@ -49,9 +53,25 @@ class WebBunkerPlatform(
 
     override val supportsNativeNotifications: Boolean = false
     override val supportsApkSelfUpdate: Boolean = false
-    override val versionTag: String = "V3.4 WEB"
+    override val versionTag: String = "V3.5 WEB"
     override val webInviteBaseUrl: String?
         get() = runCatching { jsGetWebBaseUrl() }.getOrNull()?.takeIf { it.startsWith("http") }
+
+    override val isRunningAsInstalledPwa: Boolean
+        get() = runCatching { jsIsStandalonePwa() }.getOrDefault(false)
+
+    override val isIosBrowser: Boolean
+        get() = runCatching { jsIsIosSafari() }.getOrDefault(false)
+
+    override val canPromptPwaInstall: Boolean
+        get() = runCatching { jsCanPromptInstall() }.getOrDefault(false)
+
+    override fun promptPwaInstall(onResult: (Boolean) -> Unit) {
+        scope.launch {
+            val accepted = runCatching { jsPromptInstall().awaitString() == "true" }.getOrDefault(false)
+            onResult(accepted)
+        }
+    }
 
     override fun playScanFeedback() {
         jsPlayBeep()

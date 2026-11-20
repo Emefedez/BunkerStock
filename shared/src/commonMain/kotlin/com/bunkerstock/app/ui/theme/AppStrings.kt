@@ -325,6 +325,12 @@ interface AppStrings {
     val scannerSearchingProducts: String
     val scannerNoSearchResults: String
     val scannerInStockBadge: String
+    // v3.5: Optional Web App (PWA) install card in first-time setup
+    val setupPwaTitle: String
+    val setupPwaIosHint: String
+    val setupPwaGenericHint: String
+    val setupPwaInstallBtn: String
+    val setupPwaInstalled: String
 
     fun kpiCriticalTitle(criticalDays: Int): String = when (language) {
         AppLanguage.ES -> "PRÓX. $criticalDays DÍAS"
@@ -653,7 +659,7 @@ object SpanishStrings : AppStrings {
     override val clearAll = "Vaciar todo el almacén"
     override val clearAllSub = "Elimina permanentemente todos los registros"
     override val settingsSectionAbout = "ACERCA DE"
-    override val aboutDesc = "BunkerStock v3.4 · Control logístico familiar de inventario, salud nutricional y caducidad con sincronización cifrada."
+    override val aboutDesc = "BunkerStock v3.5 · Control logístico familiar de inventario, salud nutricional y caducidad con sincronización cifrada."
     override val confirmDeleteTitle = "Eliminar Artículo"
     override val confirmDeleteMsg: (String) -> String = { "¿Seguro que deseas eliminar \"$it\" del inventario?" }
     override val confirmDemoTitle = "Restaurar Datos de Ejemplo"
@@ -805,6 +811,11 @@ object SpanishStrings : AppStrings {
     override val scannerSearchingProducts = "Buscando productos..."
     override val scannerNoSearchResults = "Sin resultados para esa búsqueda"
     override val scannerInStockBadge = "EN STOCK"
+    override val setupPwaTitle = "Añadir como Web App (opcional)"
+    override val setupPwaIosHint = "En Safari: pulsa Compartir (□↑) → Añadir a pantalla de inicio para abrirla como app a pantalla completa."
+    override val setupPwaGenericHint = "Si quieres, instálala en tu pantalla de inicio desde el botón o el menú del navegador para acceso rápido."
+    override val setupPwaInstallBtn = "Instalar Web App"
+    override val setupPwaInstalled = "Web App añadida correctamente"
 }
 
 object EnglishStrings : AppStrings {
@@ -949,7 +960,7 @@ object EnglishStrings : AppStrings {
     override val clearAll = "Clear all inventory"
     override val clearAllSub = "Permanently deletes all records"
     override val settingsSectionAbout = "ABOUT"
-    override val aboutDesc = "BunkerStock v3.4 · Family logistics, product health scoring & expiry control with E2E encrypted sync."
+    override val aboutDesc = "BunkerStock v3.5 · Family logistics, product health scoring & expiry control with E2E encrypted sync."
     override val confirmDeleteTitle = "Delete Item"
     override val confirmDeleteMsg: (String) -> String = { "Are you sure you want to delete \"$it\" from inventory?" }
     override val confirmDemoTitle = "Restore Sample Data"
@@ -1101,6 +1112,11 @@ object EnglishStrings : AppStrings {
     override val scannerSearchingProducts = "Searching products..."
     override val scannerNoSearchResults = "No products found for that query"
     override val scannerInStockBadge = "IN STOCK"
+    override val setupPwaTitle = "Add as Web App (optional)"
+    override val setupPwaIosHint = "In Safari: tap Share (□↑) → Add to Home Screen to launch full-screen like a native app."
+    override val setupPwaGenericHint = "If you'd like, install it to your home screen via the button or browser menu for quick full-screen access."
+    override val setupPwaInstallBtn = "Install Web App"
+    override val setupPwaInstalled = "Web App installed"
 }
 
 fun stringsFor(language: AppLanguage): AppStrings = when (language) {

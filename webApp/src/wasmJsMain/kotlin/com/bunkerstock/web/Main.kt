@@ -34,7 +34,8 @@ fun main() {
         }
 
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val isExpanded = maxWidth >= 700.dp
+            // Use side NavigationRail only on landscape tablet/desktop so portrait iPad keeps centered bottom nav
+            val isExpanded = maxWidth >= 840.dp && maxWidth > maxHeight
             BunkerStockRoot(
                 controller = controller,
                 platform = platform,

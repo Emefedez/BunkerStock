@@ -189,7 +189,7 @@ object OpenFoodFactsClient {
     suspend fun lookup(barcode: String): OpenFoodFactsResult? {
         val clean = barcode.trim()
         if (!barcodeRegex.matches(clean)) return null
-        val headers = if (isWebPlatform) emptyMap() else mapOf("User-Agent" to "BunkerStock-Android/3.4")
+        val headers = if (isWebPlatform) emptyMap() else mapOf("User-Agent" to "BunkerStock-Android/3.5")
         val body = PlatformHttp.getText(
             url = "https://world.openfoodfacts.org/api/v0/product/$clean.json",
             headers = headers,
@@ -205,10 +205,48 @@ object OpenFoodFactsClient {
         }.getOrNull()
     }
 
+    private fun stripAccents(input: String): String {
+        val sb = StringBuilder(input.length)
+        for (ch in input.lowercase()) {
+            sb.append(
+                when (ch) {
+                    'á', 'à', 'ä', 'â', 'ã' -> 'a'
+                    'é', 'è', 'ë', 'ê' -> 'e'
+                    'í', 'ì', 'ï', 'î' -> 'i'
+                    'ó', 'ò', 'ö', 'ô', 'õ' -> 'o'
+                    'ú', 'ù', 'ü', 'û' -> 'u'
+                    'ñ' -> 'n'
+                    'ç' -> 'c'
+                    else -> ch
+                }
+            )
+        }
+        return sb.toString()
+    }
+
+    private fun toOffTagSlug(raw: String): String =
+        stripAccents(raw)
+            .replace(Regex("[^a-z0-9]+"), "-")
+            .trim('-')
+
+    private fun parseSearchResponse(body: String): List<OpenFoodFactsResult> = runCatching {
+        val root = InventoryLogic.json.parseToJsonElement(body) as? JsonObject ?: return@runCatching emptyList()
+        val arr = (root["hits"] as? JsonArray) ?: (root["products"] as? JsonArray) ?: return@runCatching emptyList()
+        val seenCodes = HashSet<String>()
+        arr.mapNotNull { el ->
+            val obj = el as? JsonObject ?: return@mapNotNull null
+            val hit = parseProductObject(obj) ?: return@mapNotNull null
+            val dedupKey = hit.barcode.ifBlank { hit.name.lowercase() }
+            if (seenCodes.add(dedupKey)) hit else null
+        }
+    }.getOrDefault(emptyList())
+
     /**
      * YsiFoods-style product name search against Open Food Facts.
-     * On Android: uses Search-a-licious first (fast, ES/EN ranked) with cgi/search.pl fallback.
-     * On Web: uses CORS-enabled es/world.openfoodfacts.org/cgi/search.pl directly.
+     * - On Android (native HTTP, no CORS restriction): uses Search-a-licious full-text search first,
+     *   falling back to api/v2/search and cgi/search.pl.
+     * - On Web / iOS Safari: uses CORS-enabled api/v2/search (Access-Control-Allow-Origin: *) with
+     *   category + brand tag queries (since OFF's legacy cgi/search.pl returns HTTP 503 to browser Origin).
      */
     suspend fun searchByName(
         query: String,
@@ -219,36 +257,65 @@ object OpenFoodFactsClient {
         if (clean.length < 2) return emptyList()
         val encoded = urlEncodeUtf8(clean)
         val fields = "code,product_name,product_name_es,generic_name,brands,categories,categories_tags,nutriscore_grade,nova_group,additives_n,additives_tags,image_front_url,image_front_small_url,image_url,image_small_url,nutriments"
-        val headers = if (isWebPlatform) emptyMap() else mapOf("User-Agent" to "BunkerStock-Android/3.4")
+        val headers = if (isWebPlatform) emptyMap() else mapOf("User-Agent" to "BunkerStock-Android/3.5")
+        val lang = if (language == AppLanguage.ES) "es" else "en"
+        val primaryHost = if (language == AppLanguage.ES) "https://es.openfoodfacts.org" else "https://world.openfoodfacts.org"
+        val secondaryHost = if (language == AppLanguage.ES) "https://world.openfoodfacts.org" else "https://es.openfoodfacts.org"
 
-        val urls = buildList {
-            if (!isWebPlatform) {
-                val lang = if (language == AppLanguage.ES) "es" else "en"
-                add("https://search.openfoodfacts.org/search?q=$encoded&langs=$lang&page_size=$limit&fields=$fields")
-            }
-            if (language == AppLanguage.ES) {
-                add("https://es.openfoodfacts.org/cgi/search.pl?search_terms=$encoded&search_simple=1&action=process&json=1&page_size=$limit&fields=$fields")
-                add("https://world.openfoodfacts.org/cgi/search.pl?search_terms=$encoded&search_simple=1&action=process&json=1&page_size=$limit&fields=$fields")
-            } else {
-                add("https://world.openfoodfacts.org/cgi/search.pl?search_terms=$encoded&search_simple=1&action=process&json=1&page_size=$limit&fields=$fields")
-                add("https://es.openfoodfacts.org/cgi/search.pl?search_terms=$encoded&search_simple=1&action=process&json=1&page_size=$limit&fields=$fields")
+        // 1. Native Android: Search-a-licious full-text ranked search first
+        if (!isWebPlatform) {
+            val salUrl = "https://search.openfoodfacts.org/search?q=$encoded&langs=$lang&page_size=$limit&fields=$fields"
+            PlatformHttp.getText(url = salUrl, headers = headers, timeoutMs = 5500)?.let { body ->
+                val hits = parseSearchResponse(body)
+                if (hits.isNotEmpty()) return hits
             }
         }
 
-        for (url in urls) {
-            val body = PlatformHttp.getText(url = url, headers = headers, timeoutMs = 5500) ?: continue
-            val parsed = runCatching {
-                val root = InventoryLogic.json.parseToJsonElement(body) as? JsonObject ?: return@runCatching emptyList()
-                val arr = (root["hits"] as? JsonArray) ?: (root["products"] as? JsonArray) ?: return@runCatching emptyList()
-                val seenCodes = HashSet<String>()
-                arr.mapNotNull { el ->
-                    val obj = el as? JsonObject ?: return@mapNotNull null
-                    val hit = parseProductObject(obj) ?: return@mapNotNull null
-                    val dedupKey = hit.barcode.ifBlank { hit.name.lowercase() }
-                    if (seenCodes.add(dedupKey)) hit else null
+        // 2. CORS-friendly API v2 tag search (works directly from browsers + Android fallback)
+        val slug = toOffTagSlug(clean)
+        val tokens = stripAccents(clean).split(Regex("\\s+")).filter { it.length >= 2 }
+        val v2Urls = buildList {
+            if (slug.isNotEmpty()) {
+                val catParam = if (language == AppLanguage.ES) "categories_tags_es" else "categories_tags_en"
+                val countryParam = if (language == AppLanguage.ES) "&countries_tags_en=spain" else ""
+                val fetchSize = if (tokens.size > 1) maxOf(limit * 2, 24) else limit
+                // Exact phrase as category tag (e.g. "atun", "leche", "aceite-de-oliva", "galletas")
+                add("$primaryHost/api/v2/search?$catParam=${urlEncodeUtf8(slug)}$countryParam&page_size=$fetchSize&fields=$fields")
+                // Exact phrase as brand tag (e.g. "nutella", "hacendado", "coca-cola")
+                add("$secondaryHost/api/v2/search?brands_tags=${urlEncodeUtf8(slug)}&page_size=$fetchSize&fields=$fields")
+                // Multi-word queries (e.g. "atun calvo", "leche hacendado"): try primary category + brand tokens
+                if (tokens.size >= 2) {
+                    val first = urlEncodeUtf8(tokens.first())
+                    val last = urlEncodeUtf8(tokens.last())
+                    add("$primaryHost/api/v2/search?$catParam=$first&brands_tags=$last&page_size=$fetchSize&fields=$fields")
+                    add("$secondaryHost/api/v2/search?$catParam=$first$countryParam&page_size=$fetchSize&fields=$fields")
+                    add("$primaryHost/api/v2/search?brands_tags=$first&page_size=$fetchSize&fields=$fields")
                 }
-            }.getOrDefault(emptyList())
-            if (parsed.isNotEmpty()) return parsed
+            }
+        }
+
+        for (url in v2Urls) {
+            val body = PlatformHttp.getText(url = url, headers = headers, timeoutMs = 5500) ?: continue
+            val hits = parseSearchResponse(body)
+            if (hits.isNotEmpty()) {
+                return if (tokens.size >= 2) {
+                    hits.sortedByDescending { hit ->
+                        val hay = stripAccents(hit.name)
+                        tokens.count { tok -> hay.contains(tok) }
+                    }.take(limit)
+                } else {
+                    hits.take(limit)
+                }
+            }
+        }
+
+        // 3. Final fallback: legacy cgi/search.pl (mainly useful on Android if Search-a-licious was unreachable)
+        if (!isWebPlatform) {
+            val legacyUrl = "$primaryHost/cgi/search.pl?search_terms=$encoded&search_simple=1&action=process&json=1&page_size=$limit&fields=$fields"
+            PlatformHttp.getText(url = legacyUrl, headers = headers, timeoutMs = 5500)?.let { body ->
+                val hits = parseSearchResponse(body)
+                if (hits.isNotEmpty()) return hits
+            }
         }
         return emptyList()
     }

@@ -220,7 +220,8 @@ fun ScannerScreen(
                                 border = BorderStroke(
                                     1.dp,
                                     if (shoppingModeActive) colors.emerald.copy(alpha = 0.65f) else colors.amber.copy(alpha = 0.4f)
-                                )
+                                ),
+                                modifier = Modifier.padding(horizontal = 16.dp)
                             ) {
                                 Text(
                                     text = if (shoppingModeActive) strings.shoppingModeActiveHint else strings.scannerGuideHint,
@@ -250,7 +251,9 @@ fun ScannerScreen(
                             .clickable(onClick = onToggleShoppingMode)
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp),
+                            modifier = Modifier
+                                .padding(horizontal = 12.dp)
+                                .height(42.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
@@ -432,6 +435,7 @@ fun ScannerScreen(
                                                     Text(
                                                         text = item.name,
                                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                                        color = MaterialTheme.colorScheme.onSurface,
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis
                                                     )
@@ -467,6 +471,7 @@ fun ScannerScreen(
                                                 Text(
                                                     text = hit.name,
                                                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                                    color = MaterialTheme.colorScheme.onSurface,
                                                     maxLines = 2,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
@@ -557,6 +562,7 @@ fun ScannerScreen(
                                                     fontWeight = FontWeight.SemiBold,
                                                     fontSize = 12.5.sp
                                                 ),
+                                                color = MaterialTheme.colorScheme.onSurface,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
@@ -826,7 +832,10 @@ fun ScannerScreen(
                         }
                     }
                 } else null,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurface
+                ),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(
                     onSearch = {
@@ -835,8 +844,13 @@ fun ScannerScreen(
                 ),
                 shape = RoundedCornerShape(BunkerRadius.Control),
                 colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    cursorColor = colors.emerald,
                     focusedContainerColor = colors.canvas,
-                    unfocusedContainerColor = colors.canvas
+                    unfocusedContainerColor = colors.canvas,
+                    focusedBorderColor = colors.emerald,
+                    unfocusedBorderColor = colors.borderSubtle
                 )
             )
             Button(

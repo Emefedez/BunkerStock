@@ -1,4 +1,8 @@
 <p align="center">
+  <a href="https://emefedez.github.io/BunkerStock/"><img src="docs/images/header.svg" alt="BunkerStock" height="72"></a>
+</p>
+
+<p align="center">
   <a href="https://github.com/Emefedez/BunkerStock/stargazers"><img src="https://img.shields.io/github/stars/Emefedez/BunkerStock?style=flat-square&logo=github" alt="GitHub Stars"></a>
   <a href="https://github.com/Emefedez/BunkerStock/releases"><img src="https://img.shields.io/github/v/release/Emefedez/BunkerStock?include_prereleases&style=flat-square&color=22c55e" alt="Latest Release"></a>
   <a href="https://github.com/Emefedez/BunkerStock/releases/latest"><img src="https://img.shields.io/badge/Android-Native%20APK-3ddc84?style=flat-square&logo=android&logoColor=white" alt="Android Native APK"></a>
@@ -13,9 +17,15 @@
 
 # BunkerStock
 
-**BunkerStock** is a native-first **Android** app I started building for my dad (Kotlin + Jetpack Compose + Material 3) with a supporting **Compose Multiplatform Web / iOS Safari PWA (`wasmJs`)** build for **offline-first inventory management, expiration tracking, nutritional health scoring, and zero-account end-to-end encrypted family sync**.
+**BunkerStock** is a native-first **Android** app (Kotlin + Jetpack Compose + Material 3) with a supporting **Compose Multiplatform Web / iOS Safari PWA (`wasmJs`)** build for offline-first household and emergency inventory management, expiration tracking, nutritional health scoring, and zero-account end-to-end encrypted family sync, styled with a machined tactical concrete & Geiger-phosphor aesthetic.
 
-> **Android-First Architecture:** Android remains the primary target and keeps 100% native Google Jetpack Compose, CameraX + bundled offline ML Kit, DataStore, WorkManager, SAF, PrintHelper, and zero extra runtime/APK overhead (`-PandroidOnly=true` skips all web tooling). The supporting Web/iOS PWA (`-PwebOnly=true`) shares the exact same Compose UI and syncs end-to-end with Android devices at **[emefedez.github.io/BunkerStock](https://emefedez.github.io/BunkerStock/)**.
+> **Try the Web / iOS Safari PWA:** **[emefedez.github.io/BunkerStock](https://emefedez.github.io/BunkerStock/)** (also accessible at **[emefedez.github.io/bunkerstock](https://emefedez.github.io/bunkerstock)**).
+>
+> **Android-First Architecture:** Android remains the primary target and keeps 100% native Google Jetpack Compose, CameraX + bundled offline ML Kit, DataStore, WorkManager, SAF, PrintHelper, and zero extra runtime/APK overhead (`-PandroidOnly=true` skips all web tooling). The supporting Web/iOS PWA (`-PwebOnly=true`) shares the exact same Compose UI and syncs end-to-end with Android devices.
+
+### Context
+
+I had a bunch of code from when I was learning about managing more complex API calls and fetching the results with proper separation, since my dad asked for help with managing our food at home, I tried to help the best I could!!
 
 ---
 

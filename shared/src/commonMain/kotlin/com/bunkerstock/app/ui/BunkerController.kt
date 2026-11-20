@@ -20,6 +20,7 @@ import com.bunkerstock.app.domain.InventoryLogic
 import com.bunkerstock.app.platform.BunkerPlatform
 import com.bunkerstock.app.platform.BunkerStorage
 import com.bunkerstock.app.platform.currentTimeMillis
+import com.bunkerstock.app.platform.isWebPlatform
 import com.bunkerstock.app.ui.theme.stringsFor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -579,7 +580,7 @@ class BunkerController(
         }
         scannerSearchJob = scope.launch {
             modalFlow.update { it.copy(isSearchingRemoteProducts = true) }
-            delay(360L)
+            delay(if (isWebPlatform) 650L else 360L)
             val lang = uiState.value.settings.language
             val hits = OpenFoodFactsClient.searchByName(trimmed, language = lang, limit = 12)
             modalFlow.update { cur ->
@@ -795,18 +796,21 @@ class BunkerController(
 
     // Optical Scan Handling (non-blocking bottom popup keeps camera live!)
     fun onCodeScanned(rawCode: String) {
-        val code = rawCode.trim()
-        if (code.isEmpty()) return
+        val trimmedRaw = rawCode.trim()
+        if (trimmedRaw.isEmpty()) return
 
         platform.playScanFeedback()
 
-        if (FamilySyncClient.isInviteLink(code)) {
-            joinFamilyByInvite(code, uiState.value.familyGroup.memberName)
+        if (FamilySyncClient.isInviteLink(trimmedRaw)) {
+            joinFamilyByInvite(trimmedRaw, uiState.value.familyGroup.memberName)
             return
         }
 
         val state = uiState.value
-        val (gs1Expiry, gs1Batch) = InventoryLogic.extractGs1ExpiryAndBatch(code)
+        val gs1 = InventoryLogic.parseGs1Code(trimmedRaw)
+        val code = gs1.barcode
+        val gs1Expiry = gs1.expiryIso
+        val gs1Batch = gs1.batch
 
         if (!state.scannerForForm && state.shoppingModeActive) {
             handleShoppingModeScan(code, gs1Expiry, gs1Batch)

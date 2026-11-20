@@ -92,7 +92,7 @@ actual object PlatformHttp {
                 connectTimeout = timeoutMs
                 readTimeout = timeoutMs
                 instanceFollowRedirects = true
-                setRequestProperty("User-Agent", "BunkerStock-Android/3.4")
+                setRequestProperty("User-Agent", "BunkerStock-Android/3.5")
             }
             if (conn.responseCode !in 200..299) return@withContext null
             conn.inputStream.use { it.readBytes() }

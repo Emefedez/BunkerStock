@@ -14,6 +14,7 @@ import com.bunkerstock.app.data.StatusFilter
 import com.bunkerstock.app.platform.BunkerDate
 import com.bunkerstock.app.platform.formatOneDecimal
 import com.bunkerstock.app.platform.todayBunkerDate
+import com.bunkerstock.app.platform.urlDecodeUtf8
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -439,27 +440,103 @@ object InventoryLogic {
         return null
     }
 
-    fun extractGs1ExpiryAndBatch(rawCode: String): Pair<String?, String?> {
-        val cleaned = rawCode.trim().replace("\u001D", " ")
+    data class Gs1ParsedCode(
+        val barcode: String,
+        val expiryIso: String? = null,
+        val batch: String? = null,
+        val isGs1DigitalLink: Boolean = false
+    )
+
+    private fun parseGs1YyMmDd(yyStr: String, mmStr: String, ddStr: String): String? {
+        val yy = yyStr.toIntOrNull() ?: return null
+        val mm = mmStr.toIntOrNull() ?: return null
+        val dd = ddStr.toIntOrNull() ?: return null
+        if (mm !in 1..12) return null
+        val year = 2000 + yy
+        val maxDay = BunkerDate.lengthOfMonth(year, mm)
+        val safeDay = if (dd == 0) maxDay else dd.coerceIn(1, maxDay)
+        return BunkerDate.ofOrNull(year, mm, safeDay)?.toIso()
+    }
+
+    private fun normalizeGtinToBarcode(gtin: String): String {
+        val digits = gtin.filter { it.isDigit() }
+        // Standard GS1 GTIN-14 for EAN-13 has a leading '0' (e.g. 08421610357742 -> 8421610357742)
+        return if (digits.length == 14 && digits.startsWith("0")) digits.substring(1) else digits
+    }
+
+    /**
+     * Parses GS1 Digital Link URLs (e.g. Mercadona:
+     * https://qrtrack.mercadona.es/01/08421610357742/10/323414199?17=261127&16=261123)
+     * as well as classic GS1-128 / GS1 DataMatrix codes into a normalized barcode (EAN-13/GTIN),
+     * ISO expiry date, and batch/lot number — completely offline without hitting retailer redirects.
+     */
+    fun parseGs1Code(rawCode: String): Gs1ParsedCode {
+        val trimmed = rawCode.trim()
+        val cleaned = trimmed.replace("\u001D", " ")
+
+        // 1. GS1 Digital Link URI (https://.../01/<gtin>[/10/<lot>][?17=YYMMDD&15=YYMMDD&16=YYMMDD&10=<lot>])
+        val dlGtinMatch = Regex("(?:https?://[^\\s?#]+)?/01/(\\d{8,14})(?:/|\\?|#|$)", RegexOption.IGNORE_CASE).find(trimmed)
+        if (dlGtinMatch != null) {
+            val normalizedEan = normalizeGtinToBarcode(dlGtinMatch.groupValues[1])
+            val pathPart = trimmed.substringBefore("?").substringBefore("#")
+            val queryPart = trimmed.substringAfter("?", "").substringBefore("#")
+            val queryMap = LinkedHashMap<String, String>()
+            if (queryPart.isNotEmpty()) {
+                queryPart.split("&").forEach { pair ->
+                    val eq = pair.indexOf('=')
+                    if (eq > 0) {
+                        val k = pair.substring(0, eq).trim()
+                        val v = urlDecodeUtf8(pair.substring(eq + 1).trim())
+                        if (k.isNotEmpty() && v.isNotEmpty()) queryMap[k] = v
+                    }
+                }
+            }
+
+            // Expiry AI priority: 17 (Expiration Date) -> 15 (Best Before) -> 16 (Sell-By)
+            var expiryIso: String? = null
+            for (ai in listOf("17", "15", "16")) {
+                val rawDate = queryMap[ai]
+                    ?: Regex("/$ai/(\\d{6})(?:/|$)").find(pathPart)?.groupValues?.get(1)
+                if (rawDate != null && rawDate.length == 6 && rawDate.all { it.isDigit() }) {
+                    expiryIso = parseGs1YyMmDd(rawDate.substring(0, 2), rawDate.substring(2, 4), rawDate.substring(4, 6))
+                    if (expiryIso != null) break
+                }
+            }
+
+            val batch = Regex("/10/([^/?#]+)").find(pathPart)?.groupValues?.get(1)?.let(::urlDecodeUtf8)
+                ?: queryMap["10"]
+
+            return Gs1ParsedCode(
+                barcode = normalizedEan.ifBlank { trimmed },
+                expiryIso = expiryIso,
+                batch = batch?.take(32),
+                isGs1DigitalLink = true
+            )
+        }
+
+        // 2. Classic GS1-128 / GS1 DataMatrix with (01)/(17)/(15)/(10) or unbracketed 01+17
+        var barcode = trimmed
+        val parenGtin = Regex("\\(01\\)(\\d{8,14})").find(cleaned)
+        if (parenGtin != null) {
+            barcode = normalizeGtinToBarcode(parenGtin.groupValues[1])
+        } else {
+            val rawGtin = Regex("^01(\\d{14})(?:17|15|10)").find(cleaned)
+            if (rawGtin != null) {
+                barcode = normalizeGtinToBarcode(rawGtin.groupValues[1])
+            }
+        }
+
         var expiryIso: String? = null
         var batch: String? = null
 
-        val gs1Paren = Regex("\\(17\\)(\\d{2})(\\d{2})(\\d{2})").find(cleaned)
+        val gs1Paren = Regex("\\((?:17|15)\\)(\\d{2})(\\d{2})(\\d{2})").find(cleaned)
         val gs1Raw = if (gs1Paren == null) {
-            Regex("(?:^01\\d{14}|^\\x1d?)17(\\d{2})(\\d{2})(\\d{2})").find(cleaned)
+            Regex("(?:^01\\d{14}|^\\x1d?)(?:17|15)(\\d{2})(\\d{2})(\\d{2})").find(cleaned)
         } else null
 
         val match = gs1Paren ?: gs1Raw
         if (match != null) {
-            val yy = match.groupValues[1].toIntOrNull()
-            val mm = match.groupValues[2].toIntOrNull()
-            val dd = match.groupValues[3].toIntOrNull()
-            if (yy != null && mm != null && mm in 1..12 && dd != null) {
-                val year = 2000 + yy
-                val maxDay = BunkerDate.lengthOfMonth(year, mm)
-                val safeDay = if (dd == 0) maxDay else dd.coerceIn(1, maxDay)
-                expiryIso = BunkerDate.ofOrNull(year, mm, safeDay)?.toIso()
-            }
+            expiryIso = parseGs1YyMmDd(match.groupValues[1], match.groupValues[2], match.groupValues[3])
         }
 
         if (expiryIso == null) {
@@ -475,7 +552,12 @@ object InventoryLogic {
             if (lotExplicit != null) batch = lotExplicit.groupValues[1]
         }
 
-        return expiryIso to batch
+        return Gs1ParsedCode(barcode = barcode, expiryIso = expiryIso, batch = batch, isGs1DigitalLink = false)
+    }
+
+    fun extractGs1ExpiryAndBatch(rawCode: String): Pair<String?, String?> {
+        val parsed = parseGs1Code(rawCode)
+        return parsed.expiryIso to parsed.batch
     }
 
     fun estimateShelfLifeDays(name: String, category: String, nutritionFlags: List<String> = emptyList()): Long {
@@ -574,6 +656,7 @@ object InventoryLogic {
         if (Regex("^BNK-[A-Za-z0-9_-]+$", RegexOption.IGNORE_CASE).matches(t)) return true
         if (Regex("^\\d{6,18}$").matches(t)) return true
         if (t.contains("(01)") || t.contains("(17)")) return true
+        if (Regex("(?:https?://[^\\s?#]+)?/01/\\d{8,14}(?:/|\\?|#|$)", RegexOption.IGNORE_CASE).containsMatchIn(t)) return true
         return false
     }
 }

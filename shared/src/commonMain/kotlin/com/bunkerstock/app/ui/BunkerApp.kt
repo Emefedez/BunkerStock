@@ -197,6 +197,7 @@ private fun BunkerStockAppContent(
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = if (isLiveWebScanner) Color.Transparent else colors.canvas,
+            contentColor = MaterialTheme.colorScheme.onBackground,
             contentWindowInsets = WindowInsets.safeDrawing,
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {

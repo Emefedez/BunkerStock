@@ -127,7 +127,7 @@ object ProductImageStore {
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 3500
             readTimeout = 3500
-            setRequestProperty("User-Agent", "BunkerStock-Android/3.2")
+            setRequestProperty("User-Agent", "BunkerStock-Android/3.5")
         }
         try {
             if (conn.responseCode !in 200..299) return@runCatching null
@@ -173,7 +173,7 @@ object ProductImageStore {
             connectTimeout = 4000
             readTimeout = 4000
             instanceFollowRedirects = true
-            setRequestProperty("User-Agent", "BunkerStock-Android/3.2")
+            setRequestProperty("User-Agent", "BunkerStock-Android/3.5")
         }
         return try {
             if (conn.responseCode !in 200..299) return null
