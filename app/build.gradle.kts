@@ -13,8 +13,8 @@ android {
         applicationId = "com.bunkerstock.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 33
-        versionName = "3.3"
+        versionCode = 34
+        versionName = "3.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -70,6 +70,8 @@ android {
 }
 
 dependencies {
+    implementation(project(":shared"))
+
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
@@ -90,7 +92,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("androidx.print:print:1.0.0")
 
-    // CameraX for optical barcode/QR scanner
+    // CameraX for native optical barcode/QR scanner
     val cameraVersion = "1.4.0"
     implementation("androidx.camera:camera-core:$cameraVersion")
     implementation("androidx.camera:camera-camera2:$cameraVersion")

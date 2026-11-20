@@ -1,0 +1,19 @@
+{
+  "name": "BunkerStock",
+  "short_name": "BunkerStock",
+  "description": "Offline-first inventory, expiry tracking, nutritional health scoring, optical barcode scanning & E2E encrypted family sync.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#111312",
+  "theme_color": "#111312",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

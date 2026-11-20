@@ -1,0 +1,78 @@
+name: Build & Deploy Web PWA (iOS / Browser)
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-web:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Run shared Kotlin unit tests
+        run: gradle -PwebOnly=true :shared:jvmTest --stacktrace
+
+      - name: Compile Compose Multiplatform Web (WasmJs)
+        run: gradle -PwebOnly=true :webApp:wasmJsBrowserDistribution --stacktrace
+
+      - name: Prepare GitHub Pages bundle
+        run: |
+          mkdir -p _site
+          cp -r webApp/build/dist/wasmJs/productionExecutable/* _site/
+          touch _site/.nojekyll
+
+      - name: Upload Web PWA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BunkerStock-web-pwa
+          path: _site
+          retention-days: 30
+
+      - name: Configure GitHub Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+
+      - name: Upload GitHub Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy-pages:
+    if: github.event_name != 'pull_request'
+    needs: build-web
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

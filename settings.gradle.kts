@@ -13,12 +13,17 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
     repositories {
         google()
         mavenCentral()
     }
 }
 
+val webOnly = providers.gradleProperty("webOnly").orNull?.toBoolean() == true
+val androidOnly = providers.gradleProperty("androidOnly").orNull?.toBoolean() == true
+
 rootProject.name = "BunkerStock"
-include(":app")
+include(":shared")
+if (!webOnly) include(":app")
+if (!androidOnly) include(":webApp")

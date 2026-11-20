@@ -1,22 +1,29 @@
 package com.bunkerstock.app
 
+import com.bunkerstock.app.data.ExpiryBatch
 import com.bunkerstock.app.data.ExpiryStatus
+import com.bunkerstock.app.data.FamilyGroupConfig
+import com.bunkerstock.app.data.FamilySyncClient
+import com.bunkerstock.app.data.FamilySyncSnapshot
 import com.bunkerstock.app.data.InventoryItem
 import com.bunkerstock.app.data.ItemCategory
-import com.bunkerstock.app.data.ItemUnit
+import com.bunkerstock.app.data.OpenFoodFactsClient
 import com.bunkerstock.app.data.SortOption
 import com.bunkerstock.app.data.StatusFilter
+import com.bunkerstock.app.data.UpdateChecker
 import com.bunkerstock.app.domain.InventoryLogic
+import com.bunkerstock.app.platform.BunkerDate
+import com.bunkerstock.app.scanner.QrCodeUtils
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.LocalDate
 
 class InventoryLogicTest {
 
-    private val fixedToday = LocalDate.of(2026, 11, 19)
+    private val fixedToday = BunkerDate(2026, 11, 19)
 
     @Test
     fun expiryInfoThresholdsMatchOriginal() {
@@ -51,10 +58,10 @@ class InventoryLogicTest {
         assertEquals(2, metrics.criticalCount)
         assertEquals(2, metrics.warningCount)
         assertEquals(4, metrics.optimalOrNoneCount)
-        assertEquals(63.0, metrics.waterLiters, 0.01) // 12*5L + 3 boxes*1L
-        assertEquals(10, metrics.waterDays) // floor(63 / 6)
-        assertEquals(47.0, metrics.foodUnits, 0.01) // 8 + 15 + 10 + 14
-        assertEquals(67, metrics.healthyPercent) // round((4 + 2) / 9 * 100)
+        assertEquals(63.0, metrics.waterLiters, 0.01)
+        assertEquals(10, metrics.waterDays)
+        assertEquals(47.0, metrics.foodUnits, 0.01)
+        assertEquals(67, metrics.healthyPercent)
     }
 
     @Test
@@ -88,7 +95,7 @@ class InventoryLogicTest {
 
         val csv = InventoryLogic.exportToCsv(demo, fixedToday) { it.status.name }
         assertTrue(csv.startsWith("\uFEFFCodigo_Barras_QR;Nombre;"))
-        assertEquals(10, csv.lines().size) // header + 9 items
+        assertEquals(10, csv.lines().size)
     }
 
     @Test
@@ -103,7 +110,7 @@ class InventoryLogicTest {
             today = fixedToday
         )
         assertEquals(3, alerts.size)
-        assertEquals("item-3", alerts.first().id) // expired (-5d) first
+        assertEquals("item-3", alerts.first().id)
     }
 
     @Test
@@ -119,7 +126,7 @@ class InventoryLogicTest {
 
     @Test
     fun healthScoreAndUpdateVersionComparisonWork() {
-        val (goodScore, goodFlags) = com.bunkerstock.app.data.OpenFoodFactsClient.computeHealthScore(
+        val (goodScore, goodFlags) = OpenFoodFactsClient.computeHealthScore(
             nutriScoreGrade = "A",
             novaGroup = 1,
             sugars = 2.0,
@@ -133,7 +140,7 @@ class InventoryLogicTest {
         assertTrue(goodFlags.contains("HIGH_PROTEIN"))
         assertTrue(goodFlags.contains("HIGH_FIBER"))
 
-        val (badScore, badFlags) = com.bunkerstock.app.data.OpenFoodFactsClient.computeHealthScore(
+        val (badScore, badFlags) = OpenFoodFactsClient.computeHealthScore(
             nutriScoreGrade = "E",
             novaGroup = 4,
             sugars = 32.0,
@@ -147,14 +154,14 @@ class InventoryLogicTest {
         assertTrue(badFlags.contains("ULTRA_PROCESSED"))
         assertTrue(badFlags.contains("HIGH_SUGAR"))
 
-        assertTrue(com.bunkerstock.app.data.UpdateChecker.isNewerVersion("v2.6", "2.5"))
-        assertTrue(!com.bunkerstock.app.data.UpdateChecker.isNewerVersion("v2.5", "2.5"))
+        assertTrue(UpdateChecker.isNewerVersion("v2.6", "2.5"))
+        assertTrue(!UpdateChecker.isNewerVersion("v2.5", "2.5"))
     }
 
     @Test
-    fun familySyncEncryptionInviteAndMergeWork() {
-        val secret = com.bunkerstock.app.data.FamilySyncClient.generateSecretKey()
-        val snap = com.bunkerstock.app.data.FamilySyncSnapshot(
+    fun familySyncEncryptionInviteAndMergeWork() = runBlocking {
+        val secret = FamilySyncClient.generateSecretKey()
+        val snap = FamilySyncSnapshot(
             groupName = "Casa",
             items = listOf(
                 InventoryItem(id = "a", name = "Agua 5L", qty = 10.0, updatedAt = 200L),
@@ -163,26 +170,25 @@ class InventoryLogicTest {
             deletedIds = mapOf("old" to 150L),
             updatedAt = 200L
         )
-        val cipher = com.bunkerstock.app.data.FamilySyncClient.encryptSnapshot(snap, secret)
+        val cipher = FamilySyncClient.encryptSnapshot(snap, secret)
         assertTrue(!cipher.contains("Agua"))
-        val decrypted = com.bunkerstock.app.data.FamilySyncClient.decryptSnapshot(cipher, secret)
+        val decrypted = FamilySyncClient.decryptSnapshot(cipher, secret)
         assertNotNull(decrypted)
         assertEquals("Casa", decrypted?.groupName)
         assertEquals(2, decrypted?.items?.size)
 
-        val cfg = com.bunkerstock.app.data.FamilyGroupConfig(roomId = "room123", secretKey = secret, groupName = "Casa")
-        val link = com.bunkerstock.app.data.FamilySyncClient.buildInviteLink(cfg)
-        val parsed = com.bunkerstock.app.data.FamilySyncClient.parseInviteLink(link)
+        val cfg = FamilyGroupConfig(roomId = "room123", secretKey = secret, groupName = "Casa")
+        val link = FamilySyncClient.buildInviteLink(cfg)
+        val parsed = FamilySyncClient.parseInviteLink(link)
         assertEquals("room123", parsed?.roomId)
         assertEquals(secret, parsed?.secretKey)
         assertEquals("Casa", parsed?.groupName)
 
-        // LWW merge keeps newer qty + preserves local custom photo + respects tombstone
         val local = listOf(
             InventoryItem(id = "a", name = "Agua 5L", qty = 6.0, imageUri = "/data/custom.jpg", updatedAt = 150L),
             InventoryItem(id = "old", name = "Viejo", qty = 1.0, updatedAt = 100L)
         )
-        val (merged, _) = com.bunkerstock.app.data.FamilySyncClient.mergeSnapshots(local, emptyMap(), snap)
+        val (merged, _) = FamilySyncClient.mergeSnapshots(local, emptyMap(), snap)
         assertEquals(2, merged.size)
         val a = merged.first { it.id == "a" }
         assertEquals(10.0, a.qty, 0.01)
@@ -192,7 +198,6 @@ class InventoryLogicTest {
     @Test
     fun customExpiryThresholdsMultiFilterAndBatchQrPagingWork() {
         val demo = InventoryLogic.getDefaultDemoData(fixedToday)
-        // With criticalDays = 60 and warningDays = 200, item-5 (55d) becomes CRITICAL and item-1 (180d) becomes WARNING
         val item5 = demo.first { it.id == "item-5" }
         val item1 = demo.first { it.id == "item-1" }
         assertEquals(
@@ -210,7 +215,7 @@ class InventoryLogicTest {
             criticalDays = 60,
             warningDays = 200
         )
-        assertEquals(3, metrics.criticalCount) // item-2 (14d), item-8 (22d), item-5 (55d)
+        assertEquals(3, metrics.criticalCount)
 
         val multi = InventoryLogic.filterAndSortMulti(
             items = demo,
@@ -220,15 +225,14 @@ class InventoryLogicTest {
             sortOption = SortOption.EXPIRY_ASC,
             today = fixedToday
         )
-        assertEquals(2, multi.size) // item-3 (expired food) + item-2 (critical food)
+        assertEquals(2, multi.size)
 
-        assertEquals(0, com.bunkerstock.app.scanner.QrCodeUtils.batchPageCount(0))
-        assertEquals(1, com.bunkerstock.app.scanner.QrCodeUtils.batchPageCount(1))
-        assertEquals(1, com.bunkerstock.app.scanner.QrCodeUtils.batchPageCount(24))
-        assertEquals(2, com.bunkerstock.app.scanner.QrCodeUtils.batchPageCount(25))
-        assertEquals(3, com.bunkerstock.app.scanner.QrCodeUtils.batchPageCount(49))
+        assertEquals(0, QrCodeUtils.batchPageCount(0))
+        assertEquals(1, QrCodeUtils.batchPageCount(1))
+        assertEquals(1, QrCodeUtils.batchPageCount(24))
+        assertEquals(2, QrCodeUtils.batchPageCount(25))
+        assertEquals(3, QrCodeUtils.batchPageCount(49))
 
-        // Multi-batch normalization sums quantities and selects soonest expiry date
         val batched = InventoryItem(
             id = "batched-1",
             name = "Conservas",
@@ -236,8 +240,8 @@ class InventoryLogicTest {
             qty = 1.0,
             expiryDate = "2028-01-01",
             batches = listOf(
-                com.bunkerstock.app.data.ExpiryBatch(id = "b1", qty = 4.0, expiryDate = "2027-06-15"),
-                com.bunkerstock.app.data.ExpiryBatch(id = "b2", qty = 6.0, expiryDate = "2027-02-10")
+                ExpiryBatch(id = "b1", qty = 4.0, expiryDate = "2027-06-15"),
+                ExpiryBatch(id = "b2", qty = 6.0, expiryDate = "2027-02-10")
             )
         )
         val norm = InventoryLogic.normalizeWithBatches(batched)

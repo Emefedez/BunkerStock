@@ -120,7 +120,10 @@ object QrCodeUtils {
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(Intent.createChooser(intent, fileName))
+        val chooser = Intent.createChooser(intent, fileName).apply {
+            if (context !is android.app.Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(chooser)
         true
     }.getOrDefault(false)
 
@@ -291,7 +294,10 @@ object QrCodeUtils {
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(Intent.createChooser(intent, file.name))
+        val chooser = Intent.createChooser(intent, file.name).apply {
+            if (context !is android.app.Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(chooser)
         true
     }.getOrDefault(false)
 }

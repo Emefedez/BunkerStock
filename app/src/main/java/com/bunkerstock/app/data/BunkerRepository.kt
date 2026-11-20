@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.bunkerstock.app.domain.InventoryLogic
+import com.bunkerstock.app.platform.BunkerStorage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -17,7 +18,7 @@ import kotlinx.serialization.encodeToString
 
 private val Context.bunkerDataStore: DataStore<Preferences> by preferencesDataStore(name = "bunkerstock_prefs")
 
-class BunkerRepository(private val context: Context) {
+class BunkerRepository(private val context: Context) : BunkerStorage {
 
     private object Keys {
         val INVENTORY_JSON = stringPreferencesKey("bunkerstock_inventory_v1")
@@ -38,7 +39,7 @@ class BunkerRepository(private val context: Context) {
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed_v1")
     }
 
-    val inventoryFlow: Flow<List<InventoryItem>> = context.bunkerDataStore.data.map { prefs ->
+    override val inventoryFlow: Flow<List<InventoryItem>> = context.bunkerDataStore.data.map { prefs ->
         val stored = prefs[Keys.INVENTORY_JSON]
         if (stored == null) {
             InventoryLogic.getDefaultDemoData()
@@ -47,12 +48,12 @@ class BunkerRepository(private val context: Context) {
         }
     }
 
-    val deletedIdsFlow: Flow<Map<String, Long>> = context.bunkerDataStore.data.map { prefs ->
+    override val deletedIdsFlow: Flow<Map<String, Long>> = context.bunkerDataStore.data.map { prefs ->
         val stored = prefs[Keys.DELETED_IDS_JSON] ?: return@map emptyMap()
         runCatching { InventoryLogic.json.decodeFromString<Map<String, Long>>(stored) }.getOrDefault(emptyMap())
     }
 
-    val familyGroupFlow: Flow<FamilyGroupConfig> = context.bunkerDataStore.data.map { prefs ->
+    override val familyGroupFlow: Flow<FamilyGroupConfig> = context.bunkerDataStore.data.map { prefs ->
         val stored = prefs[Keys.FAMILY_GROUP_JSON] ?: return@map FamilyGroupConfig()
         runCatching { InventoryLogic.json.decodeFromString<FamilyGroupConfig>(stored) }.getOrDefault(FamilyGroupConfig())
     }
@@ -61,7 +62,7 @@ class BunkerRepository(private val context: Context) {
         prefs[Keys.NOTIFIED_EXPIRY_KEYS] ?: emptySet()
     }
 
-    val settingsFlow: Flow<AppSettings> = context.bunkerDataStore.data.map { prefs ->
+    override val settingsFlow: Flow<AppSettings> = context.bunkerDataStore.data.map { prefs ->
         AppSettings(
             language = AppLanguage.fromCode(prefs[Keys.LANGUAGE]),
             themeMode = AppThemeMode.fromCode(prefs[Keys.THEME_MODE]),
@@ -78,35 +79,35 @@ class BunkerRepository(private val context: Context) {
         )
     }
 
-    suspend fun ensureInitialized() {
+    override suspend fun ensureInitialized() {
         val prefs = context.bunkerDataStore.data.first()
         if (prefs[Keys.INVENTORY_JSON] == null) {
             saveInventory(InventoryLogic.getDefaultDemoData())
         }
     }
 
-    suspend fun saveInventory(items: List<InventoryItem>) {
+    override suspend fun saveInventory(items: List<InventoryItem>) {
         val encoded = InventoryLogic.exportToJson(items)
         context.bunkerDataStore.edit { prefs ->
             prefs[Keys.INVENTORY_JSON] = encoded
         }
     }
 
-    suspend fun saveDeletedIds(deleted: Map<String, Long>) {
+    override suspend fun saveDeletedIds(deleted: Map<String, Long>) {
         val encoded = InventoryLogic.json.encodeToString(deleted)
         context.bunkerDataStore.edit { prefs ->
             prefs[Keys.DELETED_IDS_JSON] = encoded
         }
     }
 
-    suspend fun saveFamilyGroup(config: FamilyGroupConfig) {
+    override suspend fun saveFamilyGroup(config: FamilyGroupConfig) {
         val encoded = InventoryLogic.json.encodeToString(config)
         context.bunkerDataStore.edit { prefs ->
             prefs[Keys.FAMILY_GROUP_JSON] = encoded
         }
     }
 
-    suspend fun clearFamilyGroup() {
+    override suspend fun clearFamilyGroup() {
         context.bunkerDataStore.edit { prefs ->
             prefs.remove(Keys.FAMILY_GROUP_JSON)
         }
@@ -118,38 +119,38 @@ class BunkerRepository(private val context: Context) {
         }
     }
 
-    suspend fun updateLanguage(language: AppLanguage) {
+    override suspend fun updateLanguage(language: AppLanguage) {
         context.bunkerDataStore.edit { prefs ->
             prefs[Keys.LANGUAGE] = language.code
         }
     }
 
-    suspend fun updateThemeMode(mode: AppThemeMode) {
+    override suspend fun updateThemeMode(mode: AppThemeMode) {
         context.bunkerDataStore.edit { prefs ->
             prefs[Keys.THEME_MODE] = mode.code
         }
     }
 
-    suspend fun updateWaterConfig(persons: Int, litersPerDay: Int) {
+    override suspend fun updateWaterConfig(persons: Int, litersPerDay: Int) {
         context.bunkerDataStore.edit { prefs ->
             prefs[Keys.WATER_PERSONS] = persons.coerceIn(1, 20)
             prefs[Keys.WATER_LITERS_PER_DAY] = litersPerDay.coerceIn(1, 15)
         }
     }
 
-    suspend fun updateAutoCheckUpdates(enabled: Boolean) {
+    override suspend fun updateAutoCheckUpdates(enabled: Boolean) {
         context.bunkerDataStore.edit { prefs ->
             prefs[Keys.AUTO_CHECK_UPDATES] = enabled
         }
     }
 
-    suspend fun updateExpiryNotifications(enabled: Boolean) {
+    override suspend fun updateExpiryNotifications(enabled: Boolean) {
         context.bunkerDataStore.edit { prefs ->
             prefs[Keys.EXPIRY_NOTIFICATIONS] = enabled
         }
     }
 
-    suspend fun updateExpiryThresholds(expiredDays: Int, criticalDays: Int, warningDays: Int) {
+    override suspend fun updateExpiryThresholds(expiredDays: Int, criticalDays: Int, warningDays: Int) {
         val safeExpired = expiredDays.coerceIn(0, 30)
         val safeCritical = criticalDays.coerceIn(safeExpired + 1, 365)
         val safeWarning = warningDays.coerceIn(safeCritical + 1, 730)
@@ -160,13 +161,13 @@ class BunkerRepository(private val context: Context) {
         }
     }
 
-    suspend fun markOnboardingCompleted() {
+    override suspend fun markOnboardingCompleted() {
         context.bunkerDataStore.edit { prefs ->
             prefs[Keys.ONBOARDING_COMPLETED] = true
         }
     }
 
-    suspend fun updateFamilySyncPrefs(enabled: Boolean, intervalSec: Int) {
+    override suspend fun updateFamilySyncPrefs(enabled: Boolean, intervalSec: Int) {
         context.bunkerDataStore.edit { prefs ->
             prefs[Keys.FAMILY_AUTO_SYNC] = enabled
             prefs[Keys.FAMILY_SYNC_INTERVAL_SEC] = intervalSec.coerceIn(5, 300)

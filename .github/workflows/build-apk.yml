@@ -39,20 +39,20 @@ jobs:
             echo "SIGNING_STORE_FILE=${RUNNER_TEMP}/bunkerstock.jks" >> "$GITHUB_ENV"
           fi
 
-      - name: Run unit tests
-        run: gradle testDebugUnitTest --stacktrace
+      - name: Run Android & shared unit tests (zero web overhead)
+        run: gradle -PandroidOnly=true :shared:testDebugUnitTest :app:testDebugUnitTest --stacktrace
 
       - name: Assemble Signed Release APK
         env:
           SIGNING_STORE_PASS: ${{ secrets.SIGNING_STORE_PASS }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASS: ${{ secrets.SIGNING_KEY_PASS }}
-        run: gradle assembleRelease --stacktrace
+        run: gradle -PandroidOnly=true :app:assembleRelease --stacktrace
 
       - name: Upload Signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: BunkerStock-v2.6-release-apk
+          name: BunkerStock-release-apk
           path: app/build/outputs/apk/release/app-release.apk
           retention-days: 30
 
@@ -64,6 +64,6 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           cp app/build/outputs/apk/release/app-release.apk "BunkerStock-${TAG}.apk"
           gh release create "$TAG" "BunkerStock-${TAG}.apk" \
-            --title "BúnkerStock ${TAG}" \
-            --notes "BúnkerStock ${TAG}: firma persistente para actualizaciones automáticas sin desinstalar, estética búnker con textura granulada mate y esquinas tácticas mecanizadas, escáner ML Kit + popup inferior no bloqueante, puntuación nutricional YsiFoods y caducidad GS1/estimada." \
+            --title "BunkerStock ${TAG}" \
+            --notes "BunkerStock ${TAG}: native Android APK (CameraX + offline ML Kit, DataStore, WorkManager, E2E AES-256-GCM Family Sync, YsiFoods product search & Shopping Haul batch grouping)." \
             || gh release upload "$TAG" "BunkerStock-${TAG}.apk" --clobber
