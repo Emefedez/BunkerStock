@@ -48,6 +48,9 @@ interface BunkerPlatform {
     val canPromptPwaInstall: Boolean get() = false
     fun promptPwaInstall(onResult: (Boolean) -> Unit) { onResult(false) }
 
+    /** Ensures live camera hardware is released immediately when leaving the scanner or opening full-screen overlays. */
+    fun releaseCamera() {}
+
     fun playScanFeedback() {}
 
     suspend fun evaluateExpiryNotifications() {}

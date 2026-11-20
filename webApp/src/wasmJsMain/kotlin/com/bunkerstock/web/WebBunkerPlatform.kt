@@ -40,6 +40,7 @@ private fun jsIsStandalonePwa(): Boolean = js("window.BunkerWeb.isStandalonePwa(
 private fun jsIsIosSafari(): Boolean = js("window.BunkerWeb.isIosSafari()")
 private fun jsCanPromptInstall(): Boolean = js("window.BunkerWeb.canPromptInstall()")
 private fun jsPromptInstall(): Promise<JsString> = js("window.BunkerWeb.promptInstall()")
+private fun jsStopCameraPlatform(): Unit = js("window.BunkerWeb.stopCamera()")
 
 @Serializable
 private data class BatchQrPayloadItem(val code: String, val name: String, val exp: String)
@@ -71,6 +72,10 @@ class WebBunkerPlatform(
             val accepted = runCatching { jsPromptInstall().awaitString() == "true" }.getOrDefault(false)
             onResult(accepted)
         }
+    }
+
+    override fun releaseCamera() {
+        runCatching { jsStopCameraPlatform() }
     }
 
     override fun playScanFeedback() {

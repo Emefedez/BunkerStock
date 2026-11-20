@@ -71,6 +71,7 @@
   }
 
   // Camera state
+  let cameraSessionId = 0;
   let activeStream = null;
   let activeTrack = null;
   let scanTimer = null;
@@ -92,25 +93,39 @@
     return true;
   }
 
+  function stopStreamTracks(stream) {
+    if (!stream) return;
+    stream.getTracks().forEach((t) => {
+      try { t.stop(); } catch (_) {}
+    });
+  }
+
   function stopCamera() {
+    cameraSessionId++;
+    onCodeCb = null;
     if (scanTimer) {
       clearInterval(scanTimer);
       scanTimer = null;
     }
     scanBusy = false;
     if (activeStream) {
-      activeStream.getTracks().forEach((t) => {
-        try { t.stop(); } catch (_) {}
-      });
+      stopStreamTracks(activeStream);
       activeStream = null;
       activeTrack = null;
     }
     const video = document.getElementById('bunker-cam');
     if (video) {
+      try { video.pause(); } catch (_) {}
       video.srcObject = null;
       video.style.display = 'none';
     }
   }
+
+  // Always turn off camera LED / tracks when tab or PWA is hidden/closed
+  global.addEventListener('pagehide', stopCamera);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && activeStream) stopCamera();
+  });
 
   // PWA install prompt capture (Chrome / Edge / Android browsers)
   let deferredInstallPrompt = null;
@@ -138,6 +153,7 @@
 
   async function startCamera(useBack, callback) {
     stopCamera();
+    const mySession = ++cameraSessionId;
     onCodeCb = callback;
     const video = document.getElementById('bunker-cam');
     if (!video || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -152,6 +168,11 @@
           height: { ideal: 720 }
         }
       });
+      // If user already left Scanner while permission/camera was opening, immediately release tracks!
+      if (mySession !== cameraSessionId) {
+        stopStreamTracks(stream);
+        return JSON.stringify({ ok: false, cancelled: true, hasFlash: false, supportsZoom: false });
+      }
       activeStream = stream;
       activeTrack = stream.getVideoTracks()[0] || null;
       video.srcObject = stream;
@@ -160,6 +181,11 @@
       video.style.display = 'block';
       await video.play();
 
+      if (mySession !== cameraSessionId) {
+        stopCamera();
+        return JSON.stringify({ ok: false, cancelled: true, hasFlash: false, supportsZoom: false });
+      }
+
       const caps = activeTrack && activeTrack.getCapabilities ? activeTrack.getCapabilities() : {};
       const hasFlash = Boolean(caps && caps.torch);
       const supportsZoom = Boolean(caps && caps.zoom && caps.zoom.max >= 1.8);
@@ -167,9 +193,9 @@
 
       // Kick off detector load and scan loop
       getDetector().then((detector) => {
-        if (!activeStream) return;
+        if (mySession !== cameraSessionId || !activeStream) return;
         scanTimer = setInterval(async () => {
-          if (scanBusy || !activeStream || video.readyState < 2) return;
+          if (mySession !== cameraSessionId || scanBusy || !activeStream || video.readyState < 2) return;
           scanBusy = true;
           try {
             const found = await detector.detect(video);

@@ -188,10 +188,16 @@ private fun BunkerStockAppContent(
     )
 
     // On Web/iOS Scanner tab, keep Scaffold/content container transparent so the HTML <video> behind canvas shines through!
-    val isLiveWebScanner = isWebPlatform &&
-        (state.scannerForForm || state.activeTab == BunkerTab.SCANNER) &&
+    val isScannerVisible = (state.scannerForForm || state.activeTab == BunkerTab.SCANNER) &&
         !state.showShoppingReview &&
         state.detailItem == null
+    val isLiveWebScanner = isWebPlatform && isScannerVisible
+
+    LaunchedEffect(isScannerVisible) {
+        if (!isScannerVisible) {
+            platform.releaseCamera()
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -482,7 +488,7 @@ private fun BunkerStockAppContent(
                     }
 
                     when {
-                        state.scannerForForm || state.activeTab == BunkerTab.SCANNER -> {
+                        isScannerVisible -> {
                             ScannerScreen(
                                 detectedCandidate = state.detectedCandidate,
                                 detectedExistingItem = state.detectedExistingItem,

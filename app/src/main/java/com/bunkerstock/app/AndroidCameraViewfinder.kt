@@ -86,6 +86,7 @@ fun AndroidCameraViewfinder(
     var hasFlashUnit by remember { mutableStateOf(false) }
     var cameraError by remember { mutableStateOf(false) }
     var boundCamera by remember { mutableStateOf<Camera?>(null) }
+    var cameraProviderRef by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     var previewViewRef by remember { mutableStateOf<PreviewView?>(null) }
 
     val currentOnCodeScanned by rememberUpdatedState(onCodeScanned)
@@ -113,6 +114,7 @@ fun AndroidCameraViewfinder(
         cameraProviderFuture.addListener({
             try {
                 val cameraProvider = cameraProviderFuture.get()
+                cameraProviderRef = cameraProvider
                 val preview = Preview.Builder().build().also {
                     it.surfaceProvider = pv.surfaceProvider
                 }
@@ -145,6 +147,7 @@ fun AndroidCameraViewfinder(
 
     DisposableEffect(Unit) {
         onDispose {
+            runCatching { cameraProviderRef?.unbindAll() }
             analyzer.close()
             analyzerExecutor.shutdown()
         }
