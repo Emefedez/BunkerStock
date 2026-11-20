@@ -1,6 +1,6 @@
 # BunkerStock (Android)
 
-**BunkerStock** is a native Android app (Kotlin + Jetpack Compose + Material 3) for **offline-first household & emergency inventory management, expiration tracking, nutritional health scoring, and zero-account end-to-end encrypted family sync**, styled with a machined tactical concrete & Geiger-phosphor aesthetic.
+**BunkerStock** is a native Android app (Kotlin + Jetpack Compose + Material 3) for my dad focused on **offline-first household & emergency inventory management, expiration tracking, nutritional health scoring, and zero-account end-to-end encrypted family sync**.
 
 ---
 
