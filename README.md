@@ -13,7 +13,7 @@
 
 # BunkerStock
 
-**BunkerStock** is a native-first **Android** app (Kotlin + Jetpack Compose + Material 3) with a supporting **Compose Multiplatform Web / iOS Safari PWA (`wasmJs`)** build for **offline-first household & emergency inventory management, expiration tracking, nutritional health scoring, and zero-account end-to-end encrypted family sync**, styled with a machined tactical concrete & Geiger-phosphor aesthetic.
+**BunkerStock** is a native-first **Android** app I started building for my dad (Kotlin + Jetpack Compose + Material 3) with a supporting **Compose Multiplatform Web / iOS Safari PWA (`wasmJs`)** build for **offline-first inventory management, expiration tracking, nutritional health scoring, and zero-account end-to-end encrypted family sync**.
 
 > **Android-First Architecture:** Android remains the primary target and keeps 100% native Google Jetpack Compose, CameraX + bundled offline ML Kit, DataStore, WorkManager, SAF, PrintHelper, and zero extra runtime/APK overhead (`-PandroidOnly=true` skips all web tooling). The supporting Web/iOS PWA (`-PwebOnly=true`) shares the exact same Compose UI and syncs end-to-end with Android devices at **[emefedez.github.io/BunkerStock](https://emefedez.github.io/BunkerStock/)**.
 
